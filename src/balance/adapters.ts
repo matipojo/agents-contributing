@@ -9,11 +9,20 @@ export interface UsageWindow {
   resetsAt: Date;
 }
 
+/** What the current request is charged to, when that is not the subscription windows. */
+export interface Billing {
+  pool: string;             // e.g. "ccr_promotional": cloud session credits
+  expiresAt: Date | null;   // when the pool expires or resets
+  allowed: boolean;         // false when the provider refuses requests from this pool
+  overage: boolean;         // true when paid extra usage is being spent
+}
+
 export interface UsageReading {
   provider: string;
   source: string;           // where the numbers came from
   capturedAt: Date;
   windows: UsageWindow[];
+  billing?: Billing;        // absent when requests count against the windows
 }
 
 export interface Adapter {
@@ -33,32 +42,50 @@ export function toDate(v: unknown): Date | null {
   return null;
 }
 
+type RateLimitInfo = {
+  status?: string;
+  resetsAt?: unknown;
+  rateLimitType?: string;
+  isUsingOverage?: boolean;
+  unifiedWindows?: Record<string, { utilization?: unknown; resetsAt?: unknown }>;
+};
+
 /**
- * Reads usage windows from `claude -p --output-format stream-json --verbose` output.
- * Claude Code emits a rate_limit_event whose rate_limit_info.unifiedWindows holds
- * {five_hour, seven_day}.{utilization (0 to 1), resetsAt (epoch seconds)}.
+ * Reads `claude -p --output-format stream-json --verbose` output. Claude Code emits a
+ * rate_limit_event whose rate_limit_info.unifiedWindows holds
+ * {five_hour, seven_day}.{utilization (0 to 1), resetsAt (epoch seconds)}, and whose
+ * rateLimitType names what the request was charged to. In a cloud session that can be
+ * cloud credits ("ccr_promotional", resetsAt is their expiry), and then work does not
+ * count against the windows at all.
  */
-export function parseRateLimitEvent(output: string): UsageWindow[] {
-  let windows: UsageWindow[] = [];
+export function parseProbeOutput(output: string): { windows: UsageWindow[]; billing?: Billing } {
+  let info: RateLimitInfo | undefined;
   for (const line of output.split("\n")) {
     if (!line.includes("rate_limit_event")) continue;
-    let event: { type?: string; rate_limit_info?: { unifiedWindows?: Record<string, { utilization?: unknown; resetsAt?: unknown }> } };
     try {
-      event = JSON.parse(line);
+      const event = JSON.parse(line) as { type?: string; rate_limit_info?: RateLimitInfo };
+      if (event.type === "rate_limit_event" && event.rate_limit_info) info = event.rate_limit_info; // the last is newest
     } catch {
-      continue;
+      // not JSON
     }
-    if (event.type !== "rate_limit_event") continue;
-    const found: UsageWindow[] = [];
-    for (const [name, w] of Object.entries(event.rate_limit_info?.unifiedWindows ?? {})) {
-      const resetsAt = toDate(w?.resetsAt);
-      const used = Number(w?.utilization);
-      if (!resetsAt || !Number.isFinite(used)) continue;
-      found.push({ name, usedPct: Math.round(used * 1000) / 10, resetsAt });
-    }
-    if (found.length > 0) windows = found; // the last event is the newest
   }
-  return windows;
+  const windows: UsageWindow[] = [];
+  for (const [name, w] of Object.entries(info?.unifiedWindows ?? {})) {
+    const resetsAt = toDate(w?.resetsAt);
+    const used = Number(w?.utilization);
+    if (!resetsAt || !Number.isFinite(used)) continue;
+    windows.push({ name, usedPct: Math.round(used * 1000) / 10, resetsAt });
+  }
+  const type = info?.rateLimitType;
+  // Window types such as "five_hour" or "seven_day_opus" mean the subscription pays.
+  const subscription = !type || /^(five_hour|seven_day)/.test(type);
+  const billing = !info || (subscription && !info.isUsingOverage) ? undefined : {
+    pool: subscription ? "overage" : type!,
+    expiresAt: toDate(info.resetsAt),
+    allowed: info.status !== "rejected",
+    overage: info.isUsingOverage === true,
+  };
+  return { windows, billing };
 }
 
 /** The command for the probe. Override with AGENTS_CONTRIBUTING_CLAUDE_BIN. */
@@ -80,15 +107,15 @@ function probe(now: Date): UsageReading {
     const err = e as { stdout?: string; message: string };
     // A refused request still reports its limits, so parse what came back.
     output = err.stdout ?? "";
-    if (parseRateLimitEvent(output).length === 0) {
+    if (parseProbeOutput(output).windows.length === 0) {
       throw new Error(`Could not run "${CLAUDE_BIN} -p" to read usage: ${err.message.split("\n")[0]}`);
     }
   }
-  const windows = parseRateLimitEvent(output);
+  const { windows, billing } = parseProbeOutput(output);
   if (windows.length === 0) {
     throw new Error("Claude Code reported no usage windows. Usage is only exposed on subscription plans.");
   }
-  return { provider: "claude-code", source: `${CLAUDE_BIN} -p`, capturedAt: now, windows };
+  return { provider: "claude-code", source: `${CLAUDE_BIN} -p`, capturedAt: now, windows, billing };
 }
 
 /** Claude Code: runs a tiny headless request and reads the limits Claude Code reports for it. */

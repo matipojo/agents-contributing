@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { nextWeekly, parseRateLimitEvent } from "../src/balance/adapters.ts";
+import { nextWeekly, parseProbeOutput } from "../src/balance/adapters.ts";
 import { decide } from "../src/balance/decide.ts";
 import type { ContributorConfig } from "../src/balance/config.ts";
 import type { UsageReading } from "../src/balance/adapters.ts";
@@ -83,16 +83,54 @@ const PROBE_OUTPUT = [
   '{"type":"result","subtype":"success"}',
 ].join("\n");
 
-test("parseRateLimitEvent reads both windows as percentages", () => {
-  const w = parseRateLimitEvent(PROBE_OUTPUT);
+test("parseProbeOutput reads both windows as percentages", () => {
+  const w = parseProbeOutput(PROBE_OUTPUT).windows;
   assert.deepEqual(w.map((x) => [x.name, x.usedPct, x.resetsAt.toISOString()]), [
     ["five_hour", 60, "2026-10-29T20:20:00.000Z"],
     ["seven_day", 14, "2026-10-31T03:00:00.000Z"],
   ]);
 });
 
-test("parseRateLimitEvent ignores output without usage", () => {
-  assert.deepEqual(parseRateLimitEvent('{"type":"result"}\nnot json'), []);
+test("parseProbeOutput ignores output without usage", () => {
+  assert.deepEqual(parseProbeOutput('{"type":"result"}\nnot json'), { windows: [], billing: undefined });
+});
+
+test("parseProbeOutput sees cloud credits as the billing pool", () => {
+  const b = parseProbeOutput(PROBE_OUTPUT).billing;
+  assert.equal(b?.pool, "ccr_promotional");
+  assert.equal(b?.expiresAt?.toISOString(), "2026-11-05T08:00:00.000Z");
+  assert.equal(b?.allowed, true);
+  assert.equal(b?.overage, false);
+});
+
+test("a subscription window type is not a separate billing pool", () => {
+  const line = PROBE_OUTPUT.replace('"rateLimitType":"ccr_promotional"', '"rateLimitType":"seven_day"');
+  assert.equal(parseProbeOutput(line).billing, undefined);
+});
+
+const credits = (expiresIn: number, extra: Partial<NonNullable<UsageReading["billing"]>> = {}) => ({
+  ...reading(40, 10),
+  billing: { pool: "ccr_promotional", expiresAt: hours(expiresIn), allowed: true, overage: false, ...extra },
+});
+
+test("cloud credits far from expiry: skip, even with a weekly surplus near its reset", () => {
+  const d = decide(cfg, credits(160), now);
+  assert.equal(d.verdict, "skip");
+  assert.match(d.reason, /cloud credits/);
+});
+
+test("cloud credits about to expire: contribute until limited", () => {
+  const d = decide(cfg, credits(12), now);
+  assert.equal(d.verdict, "contribute-until-limited");
+  assert.equal(d.window, "ccr_promotional");
+});
+
+test("never spend paid extra usage", () => {
+  assert.equal(decide(cfg, credits(12, { overage: true }), now).verdict, "skip");
+});
+
+test("a pool that refuses requests means skip", () => {
+  assert.equal(decide(cfg, credits(12, { allowed: false }), now).verdict, "skip");
 });
 
 test("check-balance probes Claude Code with no config", () => {

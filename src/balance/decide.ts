@@ -29,6 +29,8 @@ export function decide(cfg: ContributorConfig, reading: UsageReading, now: Date)
     };
   }
   const hoursToReset = round1((win.resetsAt.getTime() - now.getTime()) / 3_600_000);
+  const billing = reading.billing;
+  if (billing) return decideBilling(cfg, billing, now);
   const base = {
     window: win.name, hours_to_reset: hoursToReset, used_pct: win.usedPct, resets_at: win.resetsAt.toISOString(),
   };
@@ -69,5 +71,38 @@ export function decide(cfg: ContributorConfig, reading: UsageReading, now: Date)
     ...base, verdict: "contribute", surplus_pct: round1(surplus), donate_pct: donate,
     stop_at_used_pct: round1(win.usedPct + donate),
     reason: `${donate}% of the "${win.name}" window is free to donate before it resets in ${hoursToReset}h.`,
+  };
+}
+
+/**
+ * The request is charged to something other than the subscription windows, for example
+ * cloud credits. Contributing would spend that, and never move the window percentages.
+ * The remaining amount is not exposed, so the only safe surplus is what expires soon.
+ */
+function decideBilling(cfg: ContributorConfig, billing: NonNullable<UsageReading["billing"]>, now: Date): Decision {
+  const expires = billing.expiresAt;
+  const hours = expires ? round1((expires.getTime() - now.getTime()) / 3_600_000) : NaN;
+  const base = {
+    window: billing.pool, hours_to_reset: hours, used_pct: null, surplus_pct: null,
+    donate_pct: null, stop_at_used_pct: null, resets_at: expires?.toISOString() ?? "",
+  };
+  if (billing.overage) {
+    return { ...base, verdict: "skip", reason: "Requests are charged to paid extra usage. Never donate money." };
+  }
+  if (!billing.allowed) {
+    return { ...base, verdict: "skip", reason: `The "${billing.pool}" pool is refusing requests.` };
+  }
+  if (!expires || !(hours <= cfg.budget.lead_hours)) {
+    return {
+      ...base, verdict: "skip",
+      reason: `Requests are charged to "${billing.pool}" (cloud credits), not the subscription windows. ` +
+        (expires ? `They expire in ${hours}h, more than lead_hours (${cfg.budget.lead_hours}h). The owner may still need them.`
+          : "Their expiry is unknown."),
+    };
+  }
+  return {
+    ...base, verdict: "contribute-until-limited",
+    reason: `Requests are charged to "${billing.pool}" (cloud credits) that expire in ${hours}h. ` +
+      "Contribute and re-check after each task: once they run out, the check moves on to the subscription windows.",
   };
 }

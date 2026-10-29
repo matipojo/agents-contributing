@@ -42,6 +42,10 @@ headless request (`claude -p` with Haiku, no tools, no MCP servers, no saved ses
 the `rate_limit_event` that Claude Code reports for it. This works anywhere Claude Code is signed
 in to a subscription, including cloud routines. One check costs a few hundred tokens.
 
+The same event says what the run is charged to. In a cloud session that can be cloud credits
+(`ccr_promotional`) instead of the subscription. Then work does not count against the windows,
+and the check treats the credits as the pool to protect (see below).
+
 ### `declared`
 
 For providers that do not expose usage. Set `declared.weekly_reset` (for example `"sun 09:00"`)
@@ -64,6 +68,10 @@ reset, not how much is used.
 - Give `donate_fraction` of what remains after the margin.
 - If any shorter window (such as five hours) is nearly full, wait for it to reset.
 - Skip when the donation is below `min_surplus_pct`.
+- If the run is charged to cloud credits, the windows do not apply. The remaining amount is not
+  exposed, so contribute only within `lead_hours` before the credits expire, until they run out.
+  When they run out, the next check falls back to the subscription windows.
+- Never contribute when the run is charged to paid extra usage.
 
 ## Rules
 

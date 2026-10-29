@@ -31,3 +31,10 @@ not even by `/usage` inside a cloud session, so the credit rules in the skill ap
   last `cost-state` record in the session transcript, which Claude Code writes only now and
   then, so it can lag behind.
 - **Notifications:** create the routine with push notifications on, so `notify` reaches the owner.
+
+## In GitHub Actions
+
+The runner repository's workflow installs Claude Code and runs it with
+`CLAUDE_CODE_OAUTH_TOKEN`, a long-lived token for the subscription that `claude setup-token`
+creates (`setup-runner.sh` asks for it). It lasts about a year; run the setup again to renew it.
+Runs there have no session transcript, so there is no `spentUsd`; credit pools do not apply to them.

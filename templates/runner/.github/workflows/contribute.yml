@@ -1,0 +1,75 @@
+# The agents-contributing runner. Runs once a day; contributes only when the balance check
+# says there is surplus to give, and at most one contribution per runner call.
+name: contribute
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Do everything except writing to GitHub"
+        type: boolean
+        default: false
+      force:
+        description: "Contribute even when the balance check says not to"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One run at a time, so two runs never race for the same task.
+concurrency:
+  group: contribute
+  cancel-in-progress: false
+
+jobs:
+  contribute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      AGENTS_CONTRIBUTING_HOME: ${{ github.workspace }}
+      AGENTS_CONTRIBUTING_GITHUB_TOKEN: ${{ secrets.AGENTS_CONTRIBUTING_GITHUB_TOKEN }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Get the tools
+        run: |
+          git clone --quiet --depth 1 https://github.com/matipojo/agents-contributing "$RUNNER_TEMP/tools"
+          npm --prefix "$RUNNER_TEMP/tools" ci --silent
+
+      - name: Install the agent
+        run: |
+          provider=$(sed -n 's/^provider:[[:space:]]*\([a-z-]*\).*/\1/p' contributor.yml)
+          case "$provider" in
+            claude-code) npm install --global --silent @anthropic-ai/claude-code ;;
+            *) echo "::error::provider '$provider' cannot run in GitHub Actions yet. See the provider's README."; exit 1 ;;
+          esac
+
+      - name: Keep the runner repository closed
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.AGENTS_CONTRIBUTING_GITHUB_TOKEN }}
+        run: gh api -X PUT "repos/${{ github.repository }}/interaction-limits" -f limit=collaborators_only -f expiry=six_months > /dev/null
+
+      - name: Contribute
+        run: |
+          flags=""
+          [ "${{ inputs.dry_run }}" = "true" ] && flags="$flags --dry-run"
+          [ "${{ inputs.force }}" = "true" ] && flags="$flags --force"
+          # Each call makes at most one contribution: 0 contributed, 10 nothing to do, 2 error.
+          for i in $(seq 1 10); do
+            set +e
+            "$RUNNER_TEMP/tools/node_modules/.bin/tsx" "$RUNNER_TEMP/tools/src/cli/run.ts" $flags
+            code=$?
+            set -e
+            [ "$code" = "0" ] && [ -z "$flags" ] && continue
+            [ "$code" = "2" ] && exit 1
+            break
+          done

@@ -28,3 +28,12 @@ donates it. The weekly surplus is donated as usual.
 
 - **What the run spent:** Codex does not report a cost, so there is no `spentUsd`.
 - The probe counts against the plan like any turn, a few thousand mostly cached tokens.
+
+## In GitHub Actions: not yet
+
+Codex can use a ChatGPT subscription in CI only by restoring its `auth.json` from a secret and
+writing the refreshed file back after every run
+([OpenAI's guide](https://developers.openai.com/codex/auth/ci-cd-auth)). Writing a secret back
+needs a token with far more access than the runner's `public_repo` token, so the workflow does
+not support Codex yet. Run the runner from a machine where Codex is signed in instead, with the
+routine prompt in `skills/check-balance/SKILL.md`.

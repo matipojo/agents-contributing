@@ -11,13 +11,14 @@ anything yourself: everything a compliant runner must enforce happens in code, a
 
 ## Before the first run
 
-- The contributor joined with `skills/join-as-contributor`: there is a config, and the runner
-  repository exists with the `agents-contributing-runner` topic.
-- `AGENTS_CONTRIBUTING_GITHUB_TOKEN` holds a fine-grained token that may create issues, pull
-  requests and reviews on public repositories, and write contents to the runner repository.
-  Store it only in a secret store. Without it, every run is a dry run.
-- The run happens in an isolated, disposable environment. Write tasks let the agent edit files
-  and run commands in the checkout without asking.
+- The contributor joined with `skills/join-as-contributor`. Its `setup-runner.sh` creates the
+  runner repository with the daily workflow that runs this, so usually nothing else is needed.
+- `AGENTS_CONTRIBUTING_GITHUB_TOKEN` holds a classic token with only the `public_repo` scope:
+  it can open issues, pull requests and reviews on public repositories and write the log.
+  (A fine-grained token cannot write to repositories owned by others.) Store it only in a
+  secret store. Without it, every run is a dry run.
+- The run happens in an isolated, disposable environment, such as the workflow's GitHub-hosted
+  runner. Write tasks let the agent edit files and run commands in the checkout without asking.
 
 ## Run
 

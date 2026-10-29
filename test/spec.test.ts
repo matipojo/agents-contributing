@@ -14,7 +14,7 @@ test("missing front matter is an error", () => {
 });
 
 test("unknown version, missing scope and missing limits are errors", () => {
-  const r = validateText("---\nversion: 2\nhelp:\n  pr:\n    enabled: true\n    output: pr\nlimits: {}\n---\n");
+  const r = validateText("---\nversion: 2\nhelp_pr:\n  enabled: true\n  output: pr\nlimits: {}\n---\n");
   assert.ok(r.errors.some((e) => e.includes("Unknown version")));
   assert.ok(r.errors.some((e) => e.includes("no 'scope'")));
   assert.ok(r.errors.some((e) => e.includes("cooldown_hours")));
@@ -22,9 +22,15 @@ test("unknown version, missing scope and missing limits are errors", () => {
 
 test("disabled help types are not checked further", () => {
   const r = validateText([
-    "---", "version: 1", "help:", "  pr:", "    enabled: false",
+    "---", "version: 1", "help_pr:", "  enabled: false",
     "limits:", "  max_open_agent_contributions: 1", "  max_per_contributor_per_week: 1", "  cooldown_hours: 1", "---",
   ].join("\n"));
   assert.deepEqual(r.errors, []);
   assert.ok(r.warnings.some((w) => w.includes("No help type is enabled")));
+});
+
+test("a nested 'help' map is rejected", () => {
+  const r = validateText("---\nversion: 1\nhelp:\n  pr:\n    enabled: false\nlimits: {}\n---\n");
+  assert.ok(r.errors.some((e) => e.includes("'help' is not a field")));
+  assert.ok(r.errors.some((e) => e.includes("No help type defined")));
 });

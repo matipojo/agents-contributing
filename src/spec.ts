@@ -9,7 +9,8 @@ const CODE_OUTPUTS = new Set(["pr", "failing-test-pr"]);
 const REQUIRE_VALUES = new Set(["tests", "disclosure", "changelog"]);
 const HELP_FIELDS = new Set(["enabled", "scope", "output", "require", "forbidden_paths", "max_diff_lines"]);
 const LIMIT_FIELDS = ["max_open_agent_contributions", "max_per_contributor_per_week", "cooldown_hours"] as const;
-const TOP_FIELDS = new Set(["version", "help", "limits", "contact", "providers"]);
+const TOP_FIELDS = new Set(["version", "limits", "contact", "providers"]);
+export const HELP_PREFIX = "help_";
 const SCOPE_RE = /^(label|path):\S+$/;
 
 export type Output = "comment" | "pr" | "review" | "failing-test-pr";
@@ -25,7 +26,7 @@ export interface HelpType {
 
 export interface AgentsContributing {
   version: number;
-  help: Record<string, HelpType>;
+  [helpType: `help_${string}`]: HelpType;
   limits: {
     max_open_agent_contributions: number;
     max_per_contributor_per_week: number;
@@ -76,7 +77,12 @@ export function validateData(data: unknown): ValidationResult {
   }
 
   for (const key of Object.keys(data)) {
-    if (!TOP_FIELDS.has(key)) warnings.push(`Unknown top-level field '${key}' (ignored by runners).`);
+    if (!TOP_FIELDS.has(key) && !key.startsWith(HELP_PREFIX)) {
+      warnings.push(`Unknown top-level field '${key}' (ignored by runners).`);
+    }
+  }
+  if ("help" in data) {
+    errors.push("'help' is not a field. Write each help type as its own top-level field, for example 'help_triage'.");
   }
 
   const version = data.version;
@@ -86,14 +92,18 @@ export function validateData(data: unknown): ValidationResult {
     errors.push(`Unknown version '${String(version)}'. Runners will skip this repository.`);
   }
 
-  const help = isRecord(data.help) ? data.help : {};
-  if (!isRecord(data.help) || Object.keys(help).length === 0) {
-    errors.push("Missing or empty 'help' map.");
+  const help = Object.entries(data).filter(([key]) => key.startsWith(HELP_PREFIX));
+  if (help.length === 0) {
+    errors.push("No help type defined. Add at least one 'help_<type>' field, for example 'help_reproduce'.");
   }
 
   let enabledCount = 0;
-  for (const [name, cfg] of Object.entries(help)) {
-    const where = `help.${name}`;
+  for (const [where, cfg] of help) {
+    const name = where.slice(HELP_PREFIX.length);
+    if (!name) {
+      errors.push(`'${where}': missing help type name after '${HELP_PREFIX}'.`);
+      continue;
+    }
     if (!KNOWN_TYPES.has(name)) {
       warnings.push(`${where}: custom help type. Runners that do not know it will skip it.`);
     }
@@ -149,7 +159,7 @@ export function validateData(data: unknown): ValidationResult {
     }
   }
 
-  if (Object.keys(help).length > 0 && enabledCount === 0) {
+  if (help.length > 0 && enabledCount === 0) {
     warnings.push("No help type is enabled. Runners will not contribute.");
   }
 

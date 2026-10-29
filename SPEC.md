@@ -22,12 +22,14 @@ A YAML front matter block between `---` lines at the top of the file, followed b
 | Field | Required | Meaning |
 |---|---|---|
 | `version` | yes | Spec version. Currently `1`. |
-| `help` | yes | Map of help types (see below). |
+| `help_<type>` | at least one | One field per help type, for example `help_triage` or `help_reproduce` (see below). |
 | `limits` | yes | Caps the runner must respect. |
 | `contact` | no | Who to reach. |
 | `providers` | no | `allow` and/or `deny` lists of provider names. |
 
 ### Fields for each help type
+
+Each help type is its own top-level field named `help_` followed by the type name. There is no `help` map.
 
 | Field | Meaning |
 |---|---|
@@ -40,18 +42,18 @@ A YAML front matter block between `---` lines at the top of the file, followed b
 
 ### Known help types
 
-| Type | What it is | Natural output |
+| Field | What it is | Natural output |
 |---|---|---|
-| `triage` | Suggest classification and labels for an issue | `comment` |
-| `reproduce` | Reproduce a reported bug | `failing-test-pr` or `comment` |
-| `pr` | A fix or feature | `pr` |
-| `tests` | Add tests for existing code | `pr` |
-| `review` | Review an open PR | `review` |
-| `docs` | Documentation | `pr` |
-| `translate` | Translation | `pr` |
-| `answer` | Answer recurring questions | `comment` |
+| `help_triage` | Suggest classification and labels for an issue | `comment` |
+| `help_reproduce` | Reproduce a reported bug | `failing-test-pr` or `comment` |
+| `help_pr` | A fix or feature | `pr` |
+| `help_tests` | Add tests for existing code | `pr` |
+| `help_review` | Review an open PR | `review` |
+| `help_docs` | Documentation | `pr` |
+| `help_translate` | Translation | `pr` |
+| `help_answer` | Answer recurring questions | `comment` |
 
-A repository may define a help type not on this list. A runner that does not recognize a type skips it.
+A repository may define a help type not on this list, as `help_<name>`. A runner that does not recognize a type skips it.
 
 ### Limits
 
@@ -126,24 +128,23 @@ In general, every repository is closed by default: no file means no contribution
 ```yaml
 ---
 version: 1
-help:
-  triage:
-    enabled: true
-    scope: label:new
-    output: comment
-  reproduce:
-    enabled: true
-    scope: label:needs-repro
-    output: failing-test-pr
-  pr:
-    enabled: true
-    scope: label:agents-welcome
-    output: pr
-    require: [tests, disclosure]
-    forbidden_paths: [.github/, package.json, package-lock.json]
-    max_diff_lines: 300
-  review:
-    enabled: false
+help_triage:
+  enabled: true
+  scope: label:new
+  output: comment
+help_reproduce:
+  enabled: true
+  scope: label:needs-repro
+  output: failing-test-pr
+help_pr:
+  enabled: true
+  scope: label:agents-welcome
+  output: pr
+  require: [tests, disclosure]
+  forbidden_paths: [.github/, package.json, package-lock.json]
+  max_diff_lines: 300
+help_review:
+  enabled: false
 limits:
   max_open_agent_contributions: 5
   max_per_contributor_per_week: 2

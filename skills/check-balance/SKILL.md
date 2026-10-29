@@ -13,7 +13,7 @@ Run it before starting any contribution, and again after each task.
 The tools must be installed:
 
 ```bash
-git clone --depth 1 https://github.com/OWNER/agents-contributing ~/.agents-contributing/tools
+git clone --depth 1 https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools
 npm --prefix ~/.agents-contributing/tools install --silent
 ```
 

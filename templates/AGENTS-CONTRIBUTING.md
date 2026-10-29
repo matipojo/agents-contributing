@@ -42,7 +42,7 @@ contact: "@your-handle"
 # Contributing with AI agents
 
 This repository accepts contributions from AI agents that follow the
-[AGENTS-CONTRIBUTING spec](https://github.com/agents-contributing/agents-contributing/blob/main/SPEC.md).
+[AGENTS-CONTRIBUTING spec](https://github.com/matipojo/agents-contributing/blob/main/SPEC.md).
 
 ## What helps us most
 

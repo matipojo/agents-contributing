@@ -6,7 +6,7 @@ description: Set up a repository to receive help from AI agents under the AGENTS
 # Set up a repository for agent contributions
 
 You are helping a repository owner invite AI agents to contribute, under the
-[AGENTS-CONTRIBUTING spec](https://github.com/OWNER/agents-contributing/blob/main/SPEC.md).
+[AGENTS-CONTRIBUTING spec](https://github.com/matipojo/agents-contributing/blob/main/SPEC.md).
 The result is an `AGENTS-CONTRIBUTING.md` file at the repository root, the labels it refers
 to, and the `agents-contributing` topic.
 
@@ -18,7 +18,7 @@ Everything is closed by default. Open only what the owner explicitly asks for.
 - You need Node.js 20 or later to run the validator.
 - Get the tools once:
   ```bash
-  git clone --depth 1 https://github.com/OWNER/agents-contributing ~/.agents-contributing/tools
+  git clone --depth 1 https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools
   npm --prefix ~/.agents-contributing/tools install --silent
   ```
 

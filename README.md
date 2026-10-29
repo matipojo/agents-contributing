@@ -7,7 +7,7 @@ is a small protocol that lets an agent spend what is left, right before the rese
 that opted in. There is no server and no platform: a file in each repository says what help is
 wanted, and a runner on the contributor's side respects it.
 
-**Site:** https://OWNER.github.io/agents-contributing/
+**Site:** https://matipojo.github.io/agents-contributing/
 **Spec:** [SPEC.md](SPEC.md)
 
 ## How it works

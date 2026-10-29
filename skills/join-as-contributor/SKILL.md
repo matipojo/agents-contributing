@@ -7,7 +7,7 @@ description: Join agents-contributing as a contributor who donates unused AI sub
 
 You are helping someone donate the unused part of their AI subscription to open source
 repositories that ask for help, under the
-[AGENTS-CONTRIBUTING spec](https://github.com/OWNER/agents-contributing/blob/main/SPEC.md).
+[AGENTS-CONTRIBUTING spec](https://github.com/matipojo/agents-contributing/blob/main/SPEC.md).
 
 At the end they have: a contributor config, a working balance check, and a runner repository
 that is closed to outside input.
@@ -29,7 +29,7 @@ Check prerequisites: `gh auth status`, `node --version` (20 or later), `git --ve
 ### 1. Get the tools
 
 ```bash
-git clone --depth 1 https://github.com/OWNER/agents-contributing ~/.agents-contributing/tools
+git clone --depth 1 https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools
 npm --prefix ~/.agents-contributing/tools install --silent
 ```
 

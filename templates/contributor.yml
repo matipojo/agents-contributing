@@ -4,7 +4,7 @@
 version: 1
 
 # Which provider adapter to use for the balance check.
-# Known adapters: claude-code, declared
+# Known adapters: claude-code, codex, declared
 provider: claude-code
 
 # Which repositories you are willing to contribute to.

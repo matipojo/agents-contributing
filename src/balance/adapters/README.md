@@ -7,6 +7,7 @@ what a run can be charged to, and how a scheduled routine reports what it spent.
 | Folder | Agent |
 |---|---|
 | [`claude-code/`](claude-code/README.md) | Claude Code, locally or in cloud routines |
+| [`codex/`](codex/README.md) | OpenAI Codex CLI, signed in with ChatGPT |
 | [`declared/`](declared/README.md) | Any agent that does not expose usage |
 
 ## Adding an agent

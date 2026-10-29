@@ -58,6 +58,7 @@ npm test
 | Adapter | How it reads usage |
 |---|---|
 | `claude-code` | Real usage and reset times from a tiny headless `claude -p` request. Works in scheduled routines |
+| `codex` | Real usage and reset times from a tiny `codex exec` turn and its session file |
 | `declared` | No usage, only a declared weekly reset time. Contributes until the provider refuses |
 
 Each adapter has its own folder under `src/balance/adapters/`, with its code, tests and README.

@@ -49,6 +49,8 @@ with a README on how it reads usage and what a routine needs:
 
 - [`claude-code`](../../src/balance/adapters/claude-code/README.md) (default): real usage
   windows and cloud credits, with no setup.
+- [`codex`](../../src/balance/adapters/codex/README.md): real usage windows from a
+  tiny `codex exec` turn. Bought credits are never donated.
 - [`declared`](../../src/balance/adapters/declared/README.md): for agents that do not expose
   usage. Only the reset time is known.
 

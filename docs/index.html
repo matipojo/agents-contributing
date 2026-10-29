@@ -243,17 +243,16 @@ footer.site p { margin: 0 0 6px; }
     <p class="muted">A short block at the top of <code>AGENTS-CONTRIBUTING.md</code>. Everything not listed stays closed.</p>
 <pre><code>---
 version: 1
-help:
-  reproduce:
-    enabled: true
-    scope: label:needs-repro
-    output: failing-test-pr
-    forbidden_paths: [.github/]
-    max_diff_lines: 150
+help_reproduce:
+  enabled: true
+  scope: label:needs-repro
+  output: failing-test-pr
+  max_diff_lines: 150
 limits:
   max_open_agent_contributions: 3
   max_per_contributor_per_week: 1
   cooldown_hours: 24
+forbidden_paths: [.github/]
 ---</code></pre>
   </div>
 </section>

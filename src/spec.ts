@@ -7,12 +7,19 @@ export const KNOWN_TYPES = new Set([
 export const OUTPUTS = new Set(["comment", "pr", "review", "failing-test-pr"]);
 const CODE_OUTPUTS = new Set(["pr", "failing-test-pr"]);
 const REQUIRE_VALUES = new Set(["tests", "disclosure", "changelog"]);
-const HELP_FIELDS = new Set(["enabled", "scope", "output", "require", "forbidden_paths", "max_diff_lines"]);
+const HELP_FIELDS = new Set(["enabled", "scope", "output", "require", "forbidden_paths", "max_diff_lines", "limits"]);
 const LIMIT_FIELDS = ["max_open_agent_contributions", "max_per_contributor_per_week", "cooldown_hours"] as const;
-const TOP_FIELDS = new Set(["version", "help", "limits", "contact", "providers"]);
+const TOP_FIELDS = new Set(["version", "limits", "forbidden_paths", "contact", "providers"]);
+export const HELP_PREFIX = "help_";
 const SCOPE_RE = /^(label|path):\S+$/;
 
 export type Output = "comment" | "pr" | "review" | "failing-test-pr";
+
+export interface Limits {
+  max_open_agent_contributions: number;
+  max_per_contributor_per_week: number;
+  cooldown_hours: number;
+}
 
 export interface HelpType {
   enabled?: boolean;
@@ -21,16 +28,14 @@ export interface HelpType {
   require?: string[];
   forbidden_paths?: string[];
   max_diff_lines?: number;
+  limits?: Partial<Limits>;
 }
 
 export interface AgentsContributing {
   version: number;
-  help: Record<string, HelpType>;
-  limits: {
-    max_open_agent_contributions: number;
-    max_per_contributor_per_week: number;
-    cooldown_hours: number;
-  };
+  [helpType: `help_${string}`]: HelpType;
+  limits: Limits;
+  forbidden_paths?: string[];
   contact?: string;
   providers?: { allow?: string[]; deny?: string[] };
 }
@@ -76,7 +81,12 @@ export function validateData(data: unknown): ValidationResult {
   }
 
   for (const key of Object.keys(data)) {
-    if (!TOP_FIELDS.has(key)) warnings.push(`Unknown top-level field '${key}' (ignored by runners).`);
+    if (!TOP_FIELDS.has(key) && !key.startsWith(HELP_PREFIX)) {
+      warnings.push(`Unknown top-level field '${key}' (ignored by runners).`);
+    }
+  }
+  if ("help" in data) {
+    errors.push("'help' is not a field. Write each help type as its own top-level field, for example 'help_triage'.");
   }
 
   const version = data.version;
@@ -86,14 +96,21 @@ export function validateData(data: unknown): ValidationResult {
     errors.push(`Unknown version '${String(version)}'. Runners will skip this repository.`);
   }
 
-  const help = isRecord(data.help) ? data.help : {};
-  if (!isRecord(data.help) || Object.keys(help).length === 0) {
-    errors.push("Missing or empty 'help' map.");
+  const topFp = data.forbidden_paths ?? [];
+  if (!Array.isArray(topFp)) errors.push("forbidden_paths: must be a list.");
+
+  const help = Object.entries(data).filter(([key]) => key.startsWith(HELP_PREFIX));
+  if (help.length === 0) {
+    errors.push("No help type defined. Add at least one 'help_<type>' field, for example 'help_reproduce'.");
   }
 
   let enabledCount = 0;
-  for (const [name, cfg] of Object.entries(help)) {
-    const where = `help.${name}`;
+  for (const [where, cfg] of help) {
+    const name = where.slice(HELP_PREFIX.length);
+    if (!name) {
+      errors.push(`'${where}': missing help type name after '${HELP_PREFIX}'.`);
+      continue;
+    }
     if (!KNOWN_TYPES.has(name)) {
       warnings.push(`${where}: custom help type. Runners that do not know it will skip it.`);
     }
@@ -137,8 +154,16 @@ export function validateData(data: unknown): ValidationResult {
     const fp = cfg.forbidden_paths ?? [];
     if (!Array.isArray(fp)) {
       errors.push(`${where}.forbidden_paths: must be a list.`);
-    } else if (isCode && !fp.includes(".github/")) {
+    } else if (isCode && !fp.includes(".github/") && !(Array.isArray(topFp) && topFp.includes(".github/"))) {
       warnings.push(`${where}: produces code but does not forbid '.github/'. Workflow changes are the riskiest kind.`);
+    }
+
+    if (cfg.limits !== undefined) {
+      if (!isRecord(cfg.limits)) {
+        errors.push(`${where}.limits: must be a mapping.`);
+      } else {
+        checkLimits(cfg.limits, `${where}.limits`, false, errors, warnings);
+      }
     }
 
     const mdl = cfg.max_diff_lines;
@@ -149,22 +174,14 @@ export function validateData(data: unknown): ValidationResult {
     }
   }
 
-  if (Object.keys(help).length > 0 && enabledCount === 0) {
+  if (help.length > 0 && enabledCount === 0) {
     warnings.push("No help type is enabled. Runners will not contribute.");
   }
 
   if (!isRecord(data.limits)) {
     errors.push("Missing 'limits' map.");
   } else {
-    const limits = data.limits;
-    for (const key of LIMIT_FIELDS) {
-      const val = limits[key];
-      if (val === undefined) errors.push(`limits.${key}: required.`);
-      else if (!isNonNegInt(val)) errors.push(`limits.${key}: must be a non-negative integer.`);
-    }
-    for (const key of Object.keys(limits)) {
-      if (!(LIMIT_FIELDS as readonly string[]).includes(key)) warnings.push(`limits: unknown field '${key}'.`);
-    }
+    checkLimits(data.limits, "limits", true, errors, warnings);
   }
 
   const providers = data.providers;
@@ -178,6 +195,32 @@ export function validateData(data: unknown): ValidationResult {
   return errors.length === 0
     ? { errors, warnings, data: data as unknown as AgentsContributing }
     : { errors, warnings };
+}
+
+function checkLimits(
+  limits: Record<string, unknown>, where: string, required: boolean, errors: string[], warnings: string[],
+): void {
+  for (const key of LIMIT_FIELDS) {
+    const val = limits[key];
+    if (val === undefined) {
+      if (required) errors.push(`${where}.${key}: required.`);
+    } else if (!isNonNegInt(val)) {
+      errors.push(`${where}.${key}: must be a non-negative integer.`);
+    }
+  }
+  for (const key of Object.keys(limits)) {
+    if (!(LIMIT_FIELDS as readonly string[]).includes(key)) warnings.push(`${where}: unknown field '${key}'.`);
+  }
+}
+
+/** The limits that apply to one help type: its own limits, with each missing field taken from the top-level limits. */
+export function effectiveLimits(data: AgentsContributing, type: string): Limits {
+  return { ...data.limits, ...data[`${HELP_PREFIX}${type}`]?.limits };
+}
+
+/** The paths one help type must not touch: the top-level forbidden paths plus its own. */
+export function effectiveForbiddenPaths(data: AgentsContributing, type: string): string[] {
+  return [...new Set([...(data.forbidden_paths ?? []), ...(data[`${HELP_PREFIX}${type}`]?.forbidden_paths ?? [])])];
 }
 
 /** The marker line every contribution must end with. */

@@ -1,41 +1,38 @@
 ---
 version: 1
-help:
-  triage:
-    enabled: false
-    scope: label:new
-    output: comment
-  reproduce:
-    enabled: true
-    scope: label:needs-repro
-    output: failing-test-pr
-    forbidden_paths: [.github/]
-    max_diff_lines: 150
-  pr:
-    enabled: false
-    scope: label:agents-welcome
-    output: pr
-    require: [tests, disclosure]
-    forbidden_paths: [.github/]
-    max_diff_lines: 300
-  tests:
-    enabled: false
-    scope: path:src/
-    output: pr
-    forbidden_paths: [.github/]
-    max_diff_lines: 300
-  docs:
-    enabled: false
-    scope: path:docs/
-    output: pr
-  review:
-    enabled: false
-    scope: label:agent-review
-    output: review
+help_triage:
+  enabled: false
+  scope: label:new
+  output: comment
+help_reproduce:
+  enabled: true
+  scope: label:needs-repro
+  output: failing-test-pr
+  max_diff_lines: 150
+help_pr:
+  enabled: false
+  scope: label:agents-welcome
+  output: pr
+  require: [tests, disclosure]
+  max_diff_lines: 300
+help_tests:
+  enabled: false
+  scope: path:src/
+  output: pr
+  max_diff_lines: 300
+help_docs:
+  enabled: false
+  scope: path:docs/
+  output: pr
+help_review:
+  enabled: false
+  scope: label:agent-review
+  output: review
 limits:
   max_open_agent_contributions: 3
   max_per_contributor_per_week: 1
   cooldown_hours: 24
+forbidden_paths: [.github/]
 contact: "@your-handle"
 ---
 

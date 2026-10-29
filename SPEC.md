@@ -22,12 +22,15 @@ A YAML front matter block between `---` lines at the top of the file, followed b
 | Field | Required | Meaning |
 |---|---|---|
 | `version` | yes | Spec version. Currently `1`. |
-| `help` | yes | Map of help types (see below). |
+| `help_<type>` | at least one | One field per help type, for example `help_triage` or `help_reproduce` (see below). |
 | `limits` | yes | Caps the runner must respect. |
+| `forbidden_paths` | no | Files and directories no help type may touch. |
 | `contact` | no | Who to reach. |
 | `providers` | no | `allow` and/or `deny` lists of provider names. |
 
 ### Fields for each help type
+
+Each help type is its own top-level field named `help_` followed by the type name. There is no `help` map.
 
 | Field | Meaning |
 |---|---|
@@ -35,23 +38,26 @@ A YAML front matter block between `---` lines at the top of the file, followed b
 | `scope` | What it applies to, for example `label:needs-repro` or `path:docs/`. Without a scope it applies to nothing. |
 | `output` | What the agent produces: `comment`, `pr`, `review`, or `failing-test-pr`. |
 | `require` | Requirements, for example `tests`, `disclosure`, `changelog`. |
-| `forbidden_paths` | Files and directories that must not be touched. |
+| `forbidden_paths` | Files and directories this help type must not touch, in addition to the top-level `forbidden_paths`. |
 | `max_diff_lines` | Maximum size of a change. |
+| `limits` | Limits for this help type only (see Limits). |
+
+The top-level `forbidden_paths` always applies. A help type's own `forbidden_paths` adds to it and never removes from it.
 
 ### Known help types
 
-| Type | What it is | Natural output |
+| Field | What it is | Natural output |
 |---|---|---|
-| `triage` | Suggest classification and labels for an issue | `comment` |
-| `reproduce` | Reproduce a reported bug | `failing-test-pr` or `comment` |
-| `pr` | A fix or feature | `pr` |
-| `tests` | Add tests for existing code | `pr` |
-| `review` | Review an open PR | `review` |
-| `docs` | Documentation | `pr` |
-| `translate` | Translation | `pr` |
-| `answer` | Answer recurring questions | `comment` |
+| `help_triage` | Suggest classification and labels for an issue | `comment` |
+| `help_reproduce` | Reproduce a reported bug | `failing-test-pr` or `comment` |
+| `help_pr` | A fix or feature | `pr` |
+| `help_tests` | Add tests for existing code | `pr` |
+| `help_review` | Review an open PR | `review` |
+| `help_docs` | Documentation | `pr` |
+| `help_translate` | Translation | `pr` |
+| `help_answer` | Answer recurring questions | `comment` |
 
-A repository may define a help type not on this list. A runner that does not recognize a type skips it.
+A repository may define a help type not on this list, as `help_<name>`. A runner that does not recognize a type skips it.
 
 ### Limits
 
@@ -61,11 +67,13 @@ A repository may define a help type not on this list. A runner that does not rec
 | `max_per_contributor_per_week` | How many contributions per account per week. |
 | `cooldown_hours` | Minimum time between two contributions from the same account. |
 
+The top-level `limits` is required and applies to every help type. A help type may also set its own `limits` with any of the same fields. A field set on the help type replaces the top-level value for that type, counting only contributions of that type. A field the help type leaves out, or a help type without `limits`, falls back to the top-level value.
+
 ## Obligations of a compliant runner
 
 1. Never contribute to a repository without the file or to a runner repository, and re-read the file right before every submission.
 2. Skip a repository whose `version` the runner does not know.
-3. Respect all limits, `scope`, `forbidden_paths` and `max_diff_lines`.
+3. Respect all limits, both top-level and per help type, `scope`, `forbidden_paths` and `max_diff_lines`.
 4. Produce only the configured output type, and never an action that requires permissions in the repository.
 5. Open a draft PR as soon as code work starts, and skip a task that already has an agent draft.
 6. Skip an issue that already has an agent comment of the same help type.
@@ -126,28 +134,30 @@ In general, every repository is closed by default: no file means no contribution
 ```yaml
 ---
 version: 1
-help:
-  triage:
-    enabled: true
-    scope: label:new
-    output: comment
-  reproduce:
-    enabled: true
-    scope: label:needs-repro
-    output: failing-test-pr
-  pr:
-    enabled: true
-    scope: label:agents-welcome
-    output: pr
-    require: [tests, disclosure]
-    forbidden_paths: [.github/, package.json, package-lock.json]
-    max_diff_lines: 300
-  review:
-    enabled: false
+help_triage:
+  enabled: true
+  scope: label:new
+  output: comment
+help_reproduce:
+  enabled: true
+  scope: label:needs-repro
+  output: failing-test-pr
+help_pr:
+  enabled: true
+  scope: label:agents-welcome
+  output: pr
+  require: [tests, disclosure]
+  forbidden_paths: [package.json, package-lock.json]
+  max_diff_lines: 300
+  limits:
+    max_open_agent_contributions: 2
+help_review:
+  enabled: false
 limits:
   max_open_agent_contributions: 5
   max_per_contributor_per_week: 2
   cooldown_hours: 24
+forbidden_paths: [.github/]
 contact: "@maintainer"
 ---
 

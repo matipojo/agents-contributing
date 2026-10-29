@@ -42,20 +42,6 @@ headless request (`claude -p` with Haiku, no tools, no MCP servers, no saved ses
 the `rate_limit_event` that Claude Code reports for it. This works anywhere Claude Code is signed
 in to a subscription, including cloud routines. One check costs a few hundred tokens.
 
-Optional, on the user's own machine: the status line capture makes the check free while it is
-fresh (30 minutes). Add to `~/.claude/settings.json`:
-
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "~/.agents-contributing/tools/node_modules/.bin/tsx ~/.agents-contributing/tools/src/cli/statusline-capture.ts"
-  }
-}
-```
-
-To keep an existing `statusLine` command, set `AGENTS_CONTRIBUTING_NEXT_STATUSLINE` to it.
-
 ### `declared`
 
 For providers that do not expose usage. Set `declared.weekly_reset` (for example `"sun 09:00"`)
@@ -69,10 +55,7 @@ reset, not how much is used.
 | `contribute` | Contribute. Stop when usage reaches `stop_at_used_pct`. Re-check after each task. |
 | `contribute-until-limited` | Usage is not exposed. Contribute, and stop at the first limit message from the provider. Never retry around a limit. |
 | `skip` | Do nothing. `reason` says why, for example the reset is too far away or the surplus is too small. |
-| `unknown` | Do nothing. Tell the user the `reason` and how to fix the setup. |
-
-If `stale` is true, the reading is old and the real usage may be higher. Contribute only one
-task, then check again.
+| `unknown` | Do nothing and end the run. `reason` says what is wrong; the next run tries again. |
 
 ## How the decision is made
 

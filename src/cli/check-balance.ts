@@ -9,7 +9,6 @@ import { loadConfig, DEFAULT_CONFIG_PATH } from "../balance/config.ts";
 import { ADAPTERS } from "../balance/adapters.ts";
 import { decide } from "../balance/decide.ts";
 
-const STALE_MINUTES = 30;
 const path = process.argv[2] ?? DEFAULT_CONFIG_PATH;
 const now = new Date();
 
@@ -21,19 +20,11 @@ try {
   }
   const reading = adapter.read(cfg, now);
   const decision = decide(cfg, reading, now);
-  // Usage only grows inside a window, so an old reading overstates the surplus.
-  const ageMinutes = Math.round((now.getTime() - reading.capturedAt.getTime()) / 60000);
-  const stale = ageMinutes > STALE_MINUTES;
   console.log(JSON.stringify({
     provider: reading.provider,
     source: reading.source,
     captured_at: reading.capturedAt.toISOString(),
-    age_minutes: ageMinutes,
-    stale,
     ...decision,
-    ...(stale && decision.verdict === "contribute"
-      ? { reason: `${decision.reason} The reading is ${ageMinutes} minutes old, so re-check after every task.` }
-      : {}),
   }, null, 2));
   process.exit(decision.verdict === "skip" ? 10 : decision.verdict === "unknown" ? 2 : 0);
 } catch (e) {

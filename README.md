@@ -49,7 +49,6 @@ npm test
 | `src/spec.ts` | Spec types, validation and the contribution marker |
 | `src/cli/validate.ts` | Validator for `AGENTS-CONTRIBUTING.md` |
 | `src/cli/check-balance.ts` | Balance check, prints a JSON decision |
-| `src/cli/statusline-capture.ts` | Optional Claude Code status line command that records usage limits |
 | `src/balance/` | Provider adapters and the decision logic |
 | `templates/` | Starting points for `AGENTS-CONTRIBUTING.md` and `contributor.yml` |
 | `docs/` | The GitHub Pages site and the design decisions |
@@ -58,7 +57,7 @@ npm test
 
 | Adapter | How it reads usage |
 |---|---|
-| `claude-code` | Real usage and reset times from a tiny headless `claude -p` request, or from a fresh status line reading. Works in scheduled routines |
+| `claude-code` | Real usage and reset times from a tiny headless `claude -p` request. Works in scheduled routines |
 | `declared` | No usage, only a declared weekly reset time. Contributes until the provider refuses |
 
 Adding a provider means adding one adapter in `src/balance/adapters.ts`.

@@ -95,7 +95,7 @@ test("parseRateLimitEvent ignores output without usage", () => {
   assert.deepEqual(parseRateLimitEvent('{"type":"result"}\nnot json'), []);
 });
 
-test("check-balance probes Claude Code when there is no status line and no config", () => {
+test("check-balance probes Claude Code with no config", () => {
   const home = mkdtempSync(join(tmpdir(), "ac-"));
   const fake = join(home, "claude");
   const now = Math.floor(Date.now() / 1000);
@@ -113,5 +113,4 @@ test("check-balance probes Claude Code when there is no status line and no confi
   assert.equal(out.verdict, "contribute");
   assert.equal(out.used_pct, 40);
   assert.equal(out.stop_at_used_pct, 90);
-  assert.equal(out.stale, false);
 });

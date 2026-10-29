@@ -1,8 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { HOME, type ContributorConfig } from "./config.ts";
+import type { ContributorConfig } from "./config.ts";
 
 /** One usage window as reported by a provider. */
 export interface UsageWindow {
@@ -23,8 +21,6 @@ export interface Adapter {
   read(cfg: ContributorConfig, now: Date): UsageReading;
 }
 
-export const CLAUDE_CACHE = join(HOME, "claude-usage.json");
-
 /** Accepts epoch seconds, epoch milliseconds or an ISO string. */
 export function toDate(v: unknown): Date | null {
   if (typeof v === "number" && Number.isFinite(v)) return new Date(v < 1e12 ? v * 1000 : v);
@@ -35,32 +31,6 @@ export function toDate(v: unknown): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
   }
   return null;
-}
-
-/** Status line readings older than this are not used; the probe runs instead. */
-const CACHE_MAX_AGE_MINUTES = 30;
-
-/** Reads the cache written by statusline-capture.ts, or null if it is missing, old or empty. */
-function readStatusLineCache(now: Date): UsageReading | null {
-  if (!existsSync(CLAUDE_CACHE)) return null;
-  let cache: { captured_at?: unknown; rate_limits?: Record<string, { used_percentage?: unknown; resets_at?: unknown }> };
-  try {
-    cache = JSON.parse(readFileSync(CLAUDE_CACHE, "utf8"));
-  } catch {
-    return null;
-  }
-  const capturedAt = toDate(cache.captured_at);
-  if (!capturedAt || now.getTime() - capturedAt.getTime() > CACHE_MAX_AGE_MINUTES * 60000) return null;
-  const windows: UsageWindow[] = [];
-  for (const [name, w] of Object.entries(cache.rate_limits ?? {})) {
-    const resetsAt = toDate(w?.resets_at);
-    const used = Number(w?.used_percentage);
-    if (!resetsAt || !Number.isFinite(used)) continue;
-    // A window that reset after the capture is fresh again: we know nothing about it.
-    windows.push({ name, usedPct: resetsAt <= now ? null : used, resetsAt });
-  }
-  if (windows.length === 0) return null;
-  return { provider: "claude-code", source: CLAUDE_CACHE, capturedAt, windows };
 }
 
 /**
@@ -96,8 +66,7 @@ const CLAUDE_BIN = process.env.AGENTS_CONTRIBUTING_CLAUDE_BIN ?? "claude";
 
 /**
  * Asks Claude Code for the current limits with the smallest possible request: a cheap model,
- * no tools, no MCP servers and no saved session. Works headless, for example in a scheduled
- * routine, where no status line is ever drawn.
+ * no tools, no MCP servers and no saved session. Works headless, in a scheduled routine.
  */
 function probe(now: Date): UsageReading {
   let output: string;
@@ -122,14 +91,11 @@ function probe(now: Date): UsageReading {
   return { provider: "claude-code", source: `${CLAUDE_BIN} -p`, capturedAt: now, windows };
 }
 
-/**
- * Claude Code: uses a fresh status line reading when there is one (free), otherwise
- * runs a tiny headless request and reads the limits Claude Code reports for it.
- */
+/** Claude Code: runs a tiny headless request and reads the limits Claude Code reports for it. */
 export const claudeCode: Adapter = {
   name: "claude-code",
   read(_cfg, now) {
-    return readStatusLineCache(now) ?? probe(now);
+    return probe(now);
   },
 };
 

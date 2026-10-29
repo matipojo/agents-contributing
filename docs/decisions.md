@@ -75,8 +75,8 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 ## Implementation
 
 46. We decided all tooling is TypeScript only, because one language keeps the tools simple to read and contribute to.
-47. We decided the Claude Code adapter reads usage from a tiny headless `claude -p` request, because contributions run in scheduled routines where no status line is ever drawn, and Claude Code reports the usage windows for every request. A fresh status line reading is used instead when there is one, because it costs nothing.
-48. We decided usage readings older than 30 minutes are marked stale, because usage only grows inside a window and an old reading overstates the surplus.
+47. We decided the Claude Code adapter reads usage from a tiny headless `claude -p` request, because contributions run in scheduled routines where no status line is ever drawn, and Claude Code reports the usage windows for every request.
+48. We decided every check reads usage fresh and never from a cache, and nothing is installed in the contributor's day-to-day setup, because usage only grows inside a window, an old reading overstates the surplus, and the routine is the only place the project runs.
 49. We decided each help type is its own top-level field, such as `help_triage`, instead of an entry under a `help` map, because a flat file is easier to read, edit and diff than deep nesting.
 50. We decided a help type may set its own limits, and any limit it leaves out falls back to the top-level one, because an owner may want riskier help types to move slower without repeating every limit.
 51. We decided `forbidden_paths` can also be set at the top level, and a help type's own list only adds to it, because a path like `.github/` should be protected for every help type and a narrower list must never unprotect it.

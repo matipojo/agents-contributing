@@ -11,6 +11,7 @@
   "scripts": {
     "validate": "tsx src/cli/validate.ts",
     "check-balance": "tsx src/cli/check-balance.ts",
+    "contribute": "tsx src/cli/run.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts src/balance/adapters/*/*.test.ts"
   },

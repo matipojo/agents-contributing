@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { toDate, type Adapter, type Billing, type UsageReading, type UsageWindow } from "../../types.ts";
+import { claudeAgent } from "./agent.ts";
 
 type RateLimitInfo = {
   status?: string;
@@ -55,7 +56,7 @@ export function parseProbeOutput(output: string): { windows: UsageWindow[]; bill
 }
 
 /** The command for the probe. Override with AGENTS_CONTRIBUTING_CLAUDE_BIN. */
-const CLAUDE_BIN = process.env.AGENTS_CONTRIBUTING_CLAUDE_BIN ?? "claude";
+export const CLAUDE_BIN = process.env.AGENTS_CONTRIBUTING_CLAUDE_BIN ?? "claude";
 
 /**
  * Asks Claude Code for the current limits with the smallest possible request: a cheap model,
@@ -118,4 +119,5 @@ export const claudeCode: Adapter = {
     return probe(now);
   },
   spentUsd: () => sessionSpendUsd(),
+  agent: claudeAgent,
 };

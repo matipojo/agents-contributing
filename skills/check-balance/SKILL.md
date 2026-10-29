@@ -38,8 +38,8 @@ Routine prompt:
 > where `<cost>` is what this run has spent so far, read as the provider's README says
 > (leave the flag out if you cannot read it).
 > If the result has `notify`, end the run with exactly that message.
-> If the verdict is `skip` or `unknown`, stop. Otherwise do one agents-contributing task, run the
-> check again, and repeat while the verdict allows it. Keep the `stop_at_used_pct` from the first
+> If the verdict is `skip` or `unknown`, stop. Otherwise make one contribution with the runner
+> (`skills/contribute/SKILL.md`), run the check again, and repeat while the verdict allows it. Keep the `stop_at_used_pct` from the first
 > check of the run (a later check would move it up), and stop when usage reaches it or the
 > session cost reaches `max_spend_usd`.
 

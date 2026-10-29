@@ -1,4 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HOME, type ContributorConfig } from "./config.ts";
 
@@ -35,34 +37,99 @@ export function toDate(v: unknown): Date | null {
   return null;
 }
 
+/** Status line readings older than this are not used; the probe runs instead. */
+const CACHE_MAX_AGE_MINUTES = 30;
+
+/** Reads the cache written by statusline-capture.ts, or null if it is missing, old or empty. */
+function readStatusLineCache(now: Date): UsageReading | null {
+  if (!existsSync(CLAUDE_CACHE)) return null;
+  let cache: { captured_at?: unknown; rate_limits?: Record<string, { used_percentage?: unknown; resets_at?: unknown }> };
+  try {
+    cache = JSON.parse(readFileSync(CLAUDE_CACHE, "utf8"));
+  } catch {
+    return null;
+  }
+  const capturedAt = toDate(cache.captured_at);
+  if (!capturedAt || now.getTime() - capturedAt.getTime() > CACHE_MAX_AGE_MINUTES * 60000) return null;
+  const windows: UsageWindow[] = [];
+  for (const [name, w] of Object.entries(cache.rate_limits ?? {})) {
+    const resetsAt = toDate(w?.resets_at);
+    const used = Number(w?.used_percentage);
+    if (!resetsAt || !Number.isFinite(used)) continue;
+    // A window that reset after the capture is fresh again: we know nothing about it.
+    windows.push({ name, usedPct: resetsAt <= now ? null : used, resetsAt });
+  }
+  if (windows.length === 0) return null;
+  return { provider: "claude-code", source: CLAUDE_CACHE, capturedAt, windows };
+}
+
 /**
- * Claude Code: reads the cache written by statusline-capture.ts.
- * Claude Code passes rate_limits.{five_hour,seven_day}.{used_percentage,resets_at}
- * to the statusLine command on subscription plans. The fields can be missing.
+ * Reads usage windows from `claude -p --output-format stream-json --verbose` output.
+ * Claude Code emits a rate_limit_event whose rate_limit_info.unifiedWindows holds
+ * {five_hour, seven_day}.{utilization (0 to 1), resetsAt (epoch seconds)}.
+ */
+export function parseRateLimitEvent(output: string): UsageWindow[] {
+  let windows: UsageWindow[] = [];
+  for (const line of output.split("\n")) {
+    if (!line.includes("rate_limit_event")) continue;
+    let event: { type?: string; rate_limit_info?: { unifiedWindows?: Record<string, { utilization?: unknown; resetsAt?: unknown }> } };
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (event.type !== "rate_limit_event") continue;
+    const found: UsageWindow[] = [];
+    for (const [name, w] of Object.entries(event.rate_limit_info?.unifiedWindows ?? {})) {
+      const resetsAt = toDate(w?.resetsAt);
+      const used = Number(w?.utilization);
+      if (!resetsAt || !Number.isFinite(used)) continue;
+      found.push({ name, usedPct: Math.round(used * 1000) / 10, resetsAt });
+    }
+    if (found.length > 0) windows = found; // the last event is the newest
+  }
+  return windows;
+}
+
+/** The command for the probe. Override with AGENTS_CONTRIBUTING_CLAUDE_BIN. */
+const CLAUDE_BIN = process.env.AGENTS_CONTRIBUTING_CLAUDE_BIN ?? "claude";
+
+/**
+ * Asks Claude Code for the current limits with the smallest possible request: a cheap model,
+ * no tools, no MCP servers and no saved session. Works headless, for example in a scheduled
+ * routine, where no status line is ever drawn.
+ */
+function probe(now: Date): UsageReading {
+  let output: string;
+  try {
+    output = execFileSync(CLAUDE_BIN, [
+      "-p", "--output-format", "stream-json", "--verbose", "--max-turns", "1",
+      "--model", "haiku", "--tools", "", "--strict-mcp-config", "--disable-slash-commands",
+      "--no-session-persistence", "--system-prompt", "Reply with: ok", "ok",
+    ], { cwd: tmpdir(), encoding: "utf8", timeout: 120_000, stdio: ["ignore", "pipe", "pipe"] });
+  } catch (e) {
+    const err = e as { stdout?: string; message: string };
+    // A refused request still reports its limits, so parse what came back.
+    output = err.stdout ?? "";
+    if (parseRateLimitEvent(output).length === 0) {
+      throw new Error(`Could not run "${CLAUDE_BIN} -p" to read usage: ${err.message.split("\n")[0]}`);
+    }
+  }
+  const windows = parseRateLimitEvent(output);
+  if (windows.length === 0) {
+    throw new Error("Claude Code reported no usage windows. Usage is only exposed on subscription plans.");
+  }
+  return { provider: "claude-code", source: `${CLAUDE_BIN} -p`, capturedAt: now, windows };
+}
+
+/**
+ * Claude Code: uses a fresh status line reading when there is one (free), otherwise
+ * runs a tiny headless request and reads the limits Claude Code reports for it.
  */
 export const claudeCode: Adapter = {
   name: "claude-code",
   read(_cfg, now) {
-    if (!existsSync(CLAUDE_CACHE)) {
-      throw new Error(
-        `No usage cache at ${CLAUDE_CACHE}. Install the statusLine capture (see skills/check-balance/SKILL.md) and use Claude Code once.`,
-      );
-    }
-    const cache = JSON.parse(readFileSync(CLAUDE_CACHE, "utf8")) as {
-      captured_at?: unknown;
-      rate_limits?: Record<string, { used_percentage?: unknown; resets_at?: unknown }>;
-    };
-    const capturedAt = toDate(cache.captured_at) ?? new Date(0);
-    const windows: UsageWindow[] = [];
-    for (const [name, w] of Object.entries(cache.rate_limits ?? {})) {
-      const resetsAt = toDate(w?.resets_at);
-      const used = Number(w?.used_percentage);
-      if (!resetsAt || !Number.isFinite(used)) continue;
-      // A window that reset after the capture is fresh again: we know nothing about it.
-      windows.push({ name, usedPct: resetsAt <= now ? null : used, resetsAt });
-    }
-    if (windows.length === 0) throw new Error("The usage cache has no rate_limits windows.");
-    return { provider: "claude-code", source: CLAUDE_CACHE, capturedAt, windows };
+    return readStatusLineCache(now) ?? probe(now);
   },
 };
 

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -24,7 +24,7 @@ export const DEFAULT_CONFIG_PATH = join(HOME, "contributor.yml");
 
 const DEFAULTS: ContributorConfig = {
   version: 1,
-  provider: "declared",
+  provider: "claude-code",
   targets: { repos: [], topics: ["agents-contributing"] },
   help_types: ["reproduce", "triage", "tests", "docs"],
   budget: { window: "seven_day", lead_hours: 24, margin_pct: 10, donate_fraction: 1, min_surplus_pct: 5 },
@@ -32,8 +32,10 @@ const DEFAULTS: ContributorConfig = {
   log: true,
 };
 
+/** A missing config at the default path means "use the defaults", so a routine needs no setup. */
 export function loadConfig(path = DEFAULT_CONFIG_PATH): ContributorConfig {
-  const raw = (parseYaml(readFileSync(path, "utf8")) ?? {}) as Partial<ContributorConfig>;
+  const missingDefault = path === DEFAULT_CONFIG_PATH && !existsSync(path);
+  const raw = (missingDefault ? {} : parseYaml(readFileSync(path, "utf8")) ?? {}) as Partial<ContributorConfig>;
   const cfg: ContributorConfig = {
     ...DEFAULTS,
     ...raw,

@@ -8,25 +8,42 @@ description: Check how much unused AI subscription capacity is left before the u
 Decides whether there is unused subscription capacity to donate right now, and how much.
 Run it before starting any contribution, and again after each task.
 
-## Setup
-
-The tools must be installed:
+## Run
 
 ```bash
-git clone --depth 1 https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools
-npm --prefix ~/.agents-contributing/tools install --silent
+bash skills/check-balance/check.sh
 ```
 
-The config lives at `~/.agents-contributing/contributor.yml`.
-Set `AGENTS_CONTRIBUTING_HOME` to use another directory.
+The script installs the tools on first use (into `~/.agents-contributing/tools`) and needs no
+config and no input. Exit codes: `0` contribute, `10` skip, `2` unknown or error. Output is JSON.
 
-### Provider: `claude-code`
+To change the defaults, write `~/.agents-contributing/contributor.yml` from
+`templates/contributor.yml`. Set `AGENTS_CONTRIBUTING_HOME` to use another directory.
 
-Claude Code passes usage limits to its status line command. On subscription plans this can
-include `rate_limits.five_hour` and `rate_limits.seven_day`, each with `used_percentage` and
-`resets_at`. A small capture command saves them for the balance check.
+## Run it on a schedule
 
-Add this to `~/.claude/settings.json`:
+Contributions run unattended, in a scheduled routine. Schedule it **daily**: with `lead_hours: 24`
+a daily run always lands once inside the day before the weekly reset, whatever day that is, and
+every other run skips at almost no cost. The user is not asked anything.
+
+Routine prompt:
+
+> Run the balance check:
+> `[ -d ~/.agents-contributing/tools ] || git clone --depth 1 https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools; bash ~/.agents-contributing/tools/skills/check-balance/check.sh`.
+> If the verdict is `skip` or `unknown`, stop. Otherwise do one agents-contributing task, run the check again,
+> and repeat until the verdict is no longer `contribute` or usage reaches `stop_at_used_pct`.
+
+## Providers
+
+### `claude-code` (default)
+
+Reads the real usage windows, `five_hour` and `seven_day`, with no setup. It runs one tiny
+headless request (`claude -p` with Haiku, no tools, no MCP servers, no saved session) and reads
+the `rate_limit_event` that Claude Code reports for it. This works anywhere Claude Code is signed
+in to a subscription, including cloud routines. One check costs a few hundred tokens.
+
+Optional, on the user's own machine: the status line capture makes the check free while it is
+fresh (30 minutes). Add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -37,26 +54,13 @@ Add this to `~/.claude/settings.json`:
 }
 ```
 
-If the user already has a `statusLine` command, keep it: set the environment variable
-`AGENTS_CONTRIBUTING_NEXT_STATUSLINE` to their old command. The capture passes the same input
-through and prints its output.
+To keep an existing `statusLine` command, set `AGENTS_CONTRIBUTING_NEXT_STATUSLINE` to it.
 
-The cache fills the first time Claude Code renders the status line. If the fields are missing
-on the user's plan or version, use the `declared` provider instead.
-
-### Provider: `declared`
+### `declared`
 
 For providers that do not expose usage. Set `declared.weekly_reset` (for example `"sun 09:00"`)
 and `declared.timezone` (for example `Asia/Jerusalem`). The check then only knows the time to
 reset, not how much is used.
-
-## Run
-
-```bash
-npx --prefix ~/.agents-contributing/tools tsx ~/.agents-contributing/tools/src/cli/check-balance.ts
-```
-
-Exit codes: `0` contribute, `10` skip, `2` unknown or error. Output is JSON.
 
 ## Read the result
 

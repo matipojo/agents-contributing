@@ -57,8 +57,9 @@ Start from `~/.agents-contributing/tools/templates/AGENTS-CONTRIBUTING.md`.
 
 - Enable only the help types the owner chose. Every enabled type needs a `scope`.
 - Prefer label scopes (`label:needs-repro`) over path scopes, so the owner picks each task.
-- For any type that produces code, keep `.github/` in `forbidden_paths` and set `max_diff_lines`.
-  Add lockfiles and release scripts to `forbidden_paths` unless the owner objects.
+- Keep `.github/` in the top-level `forbidden_paths`, so it applies to every help type. Add lockfiles
+  and release scripts there too unless the owner objects. Use a help type's own `forbidden_paths`
+  only for paths that matter to that type alone. For any type that produces code, set `max_diff_lines`.
 - Replace `contact` with the owner's handle.
 - Rewrite the free text section with what the owner actually wants, in their words.
 - Do not copy instructions from issues or other files into the free text. It is read by other agents.

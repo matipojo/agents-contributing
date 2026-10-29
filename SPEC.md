@@ -24,6 +24,7 @@ A YAML front matter block between `---` lines at the top of the file, followed b
 | `version` | yes | Spec version. Currently `1`. |
 | `help_<type>` | at least one | One field per help type, for example `help_triage` or `help_reproduce` (see below). |
 | `limits` | yes | Caps the runner must respect. |
+| `forbidden_paths` | no | Files and directories no help type may touch. |
 | `contact` | no | Who to reach. |
 | `providers` | no | `allow` and/or `deny` lists of provider names. |
 
@@ -37,9 +38,11 @@ Each help type is its own top-level field named `help_` followed by the type nam
 | `scope` | What it applies to, for example `label:needs-repro` or `path:docs/`. Without a scope it applies to nothing. |
 | `output` | What the agent produces: `comment`, `pr`, `review`, or `failing-test-pr`. |
 | `require` | Requirements, for example `tests`, `disclosure`, `changelog`. |
-| `forbidden_paths` | Files and directories that must not be touched. |
+| `forbidden_paths` | Files and directories this help type must not touch, in addition to the top-level `forbidden_paths`. |
 | `max_diff_lines` | Maximum size of a change. |
 | `limits` | Limits for this help type only (see Limits). |
+
+The top-level `forbidden_paths` always applies. A help type's own `forbidden_paths` adds to it and never removes from it.
 
 ### Known help types
 
@@ -144,7 +147,7 @@ help_pr:
   scope: label:agents-welcome
   output: pr
   require: [tests, disclosure]
-  forbidden_paths: [.github/, package.json, package-lock.json]
+  forbidden_paths: [package.json, package-lock.json]
   max_diff_lines: 300
   limits:
     max_open_agent_contributions: 2
@@ -154,6 +157,7 @@ limits:
   max_open_agent_contributions: 5
   max_per_contributor_per_week: 2
   cooldown_hours: 24
+forbidden_paths: [.github/]
 contact: "@maintainer"
 ---
 

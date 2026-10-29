@@ -9,7 +9,7 @@ const CODE_OUTPUTS = new Set(["pr", "failing-test-pr"]);
 const REQUIRE_VALUES = new Set(["tests", "disclosure", "changelog"]);
 const HELP_FIELDS = new Set(["enabled", "scope", "output", "require", "forbidden_paths", "max_diff_lines", "limits"]);
 const LIMIT_FIELDS = ["max_open_agent_contributions", "max_per_contributor_per_week", "cooldown_hours"] as const;
-const TOP_FIELDS = new Set(["version", "limits", "contact", "providers"]);
+const TOP_FIELDS = new Set(["version", "limits", "forbidden_paths", "contact", "providers"]);
 export const HELP_PREFIX = "help_";
 const SCOPE_RE = /^(label|path):\S+$/;
 
@@ -35,6 +35,7 @@ export interface AgentsContributing {
   version: number;
   [helpType: `help_${string}`]: HelpType;
   limits: Limits;
+  forbidden_paths?: string[];
   contact?: string;
   providers?: { allow?: string[]; deny?: string[] };
 }
@@ -95,6 +96,9 @@ export function validateData(data: unknown): ValidationResult {
     errors.push(`Unknown version '${String(version)}'. Runners will skip this repository.`);
   }
 
+  const topFp = data.forbidden_paths ?? [];
+  if (!Array.isArray(topFp)) errors.push("forbidden_paths: must be a list.");
+
   const help = Object.entries(data).filter(([key]) => key.startsWith(HELP_PREFIX));
   if (help.length === 0) {
     errors.push("No help type defined. Add at least one 'help_<type>' field, for example 'help_reproduce'.");
@@ -150,7 +154,7 @@ export function validateData(data: unknown): ValidationResult {
     const fp = cfg.forbidden_paths ?? [];
     if (!Array.isArray(fp)) {
       errors.push(`${where}.forbidden_paths: must be a list.`);
-    } else if (isCode && !fp.includes(".github/")) {
+    } else if (isCode && !fp.includes(".github/") && !(Array.isArray(topFp) && topFp.includes(".github/"))) {
       warnings.push(`${where}: produces code but does not forbid '.github/'. Workflow changes are the riskiest kind.`);
     }
 
@@ -212,6 +216,11 @@ function checkLimits(
 /** The limits that apply to one help type: its own limits, with each missing field taken from the top-level limits. */
 export function effectiveLimits(data: AgentsContributing, type: string): Limits {
   return { ...data.limits, ...data[`${HELP_PREFIX}${type}`]?.limits };
+}
+
+/** The paths one help type must not touch: the top-level forbidden paths plus its own. */
+export function effectiveForbiddenPaths(data: AgentsContributing, type: string): string[] {
+  return [...new Set([...(data.forbidden_paths ?? []), ...(data[`${HELP_PREFIX}${type}`]?.forbidden_paths ?? [])])];
 }
 
 /** The marker line every contribution must end with. */

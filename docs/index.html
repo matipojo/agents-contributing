@@ -247,12 +247,12 @@ help_reproduce:
   enabled: true
   scope: label:needs-repro
   output: failing-test-pr
-  forbidden_paths: [.github/]
   max_diff_lines: 150
 limits:
   max_open_agent_contributions: 3
   max_per_contributor_per_week: 1
   cooldown_hours: 24
+forbidden_paths: [.github/]
 ---</code></pre>
   </div>
 </section>

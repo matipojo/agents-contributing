@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { effectiveLimits, validateText } from "../src/spec.ts";
+import { effectiveForbiddenPaths, effectiveLimits, validateText } from "../src/spec.ts";
 
 test("the template is valid with no warnings", () => {
   const r = validateText(readFileSync("templates/AGENTS-CONTRIBUTING.md", "utf8"));
@@ -57,4 +57,18 @@ test("invalid per-type limits are errors", () => {
     "limits:", "  max_open_agent_contributions: 3", "  max_per_contributor_per_week: 1", "  cooldown_hours: 24", "---",
   ].join("\n"));
   assert.ok(r.errors.some((e) => e.includes("help_pr.limits.cooldown_hours")));
+});
+
+test("top-level forbidden_paths apply to every help type and add to its own", () => {
+  const r = validateText([
+    "---", "version: 1",
+    "help_pr:", "  enabled: true", "  scope: label:x", "  output: pr", "  max_diff_lines: 100",
+    "  forbidden_paths: [package.json]",
+    "limits:", "  max_open_agent_contributions: 3", "  max_per_contributor_per_week: 1", "  cooldown_hours: 24",
+    "forbidden_paths: [.github/]", "---",
+  ].join("\n"));
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings, []);
+  assert.ok(r.data);
+  assert.deepEqual(effectiveForbiddenPaths(r.data, "pr"), [".github/", "package.json"]);
 });

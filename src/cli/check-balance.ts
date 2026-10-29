@@ -3,12 +3,12 @@
  * Decide whether there is unused subscription capacity to donate right now.
  *
  * Usage: npx tsx src/cli/check-balance.ts [--spent-usd N] [path/to/contributor.yml]
- * --spent-usd is what this run has spent so far, for the daily cap on cloud credits.
- * Without it, the last cost recorded in this session's transcript is used.
+ * --spent-usd is what this run has spent so far, for the daily cap on credits.
+ * Without it, the adapter's own estimate is used, if it has one.
  * Prints a JSON decision. Exit codes: 0 contribute, 10 skip, 2 unknown or error.
  */
 import { loadConfig, DEFAULT_CONFIG_PATH } from "../balance/config.ts";
-import { ADAPTERS, sessionSpendUsd } from "../balance/adapters.ts";
+import { ADAPTERS } from "../balance/adapters/index.ts";
 import { decide } from "../balance/decide.ts";
 
 const args = process.argv.slice(2);
@@ -24,7 +24,7 @@ try {
     throw new Error(`Unknown provider "${cfg.provider}". Known: ${Object.keys(ADAPTERS).join(", ")}.`);
   }
   const reading = adapter.read(cfg, now);
-  const spent = Number.isFinite(spentArg) ? spentArg : sessionSpendUsd();
+  const spent = Number.isFinite(spentArg) ? spentArg : adapter.spentUsd?.() ?? null;
   const decision = decide(cfg, reading, now, spent);
   console.log(JSON.stringify({
     provider: reading.provider,

@@ -12,7 +12,7 @@
     "validate": "tsx src/cli/validate.ts",
     "check-balance": "tsx src/cli/check-balance.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts src/balance/adapters/*/*.test.ts"
   },
   "dependencies": {
     "tsx": "4.23.15",

@@ -1,5 +1,5 @@
 import type { ContributorConfig } from "./config.ts";
-import type { UsageReading } from "./adapters.ts";
+import type { UsageReading } from "./types.ts";
 
 export type Verdict = "contribute" | "contribute-until-limited" | "skip" | "unknown";
 
@@ -86,7 +86,7 @@ export function decide(cfg: ContributorConfig, reading: UsageReading, now: Date,
 
 /**
  * The request is charged to something other than the subscription windows, for example
- * cloud credits. Contributing would spend that, and never move the window percentages.
+ * credits. Contributing would spend that, and never move the window percentages.
  * The remaining amount is not exposed, so credits are donated only in the last
  * credits.lead_days before they expire, at most credits.daily_usd per daily run.
  */
@@ -104,14 +104,14 @@ function decideBilling(
 
   if (billing.overage) return skip("Requests are charged to paid extra usage. Never donate money.");
   if (!billing.allowed) return skip(`The "${billing.pool}" pool is refusing requests.`);
-  const what = `Requests are charged to "${billing.pool}" (cloud credits), not the subscription windows.`;
+  const what = `Requests are charged to ${billing.label} ("${billing.pool}"), not the subscription windows.`;
   if (!expires) return skip(`${what} Their expiry is unknown.`);
 
   const days = hours / 24;
   const donating = cfg.donate.includes("credits");
   // A daily run lands exactly once in this 24-hour band, so the reminder goes out once.
   const remind = days <= c.remind_days && days > c.remind_days - 1
-    ? `Your Claude cloud session credits expire on ${expires.toISOString().slice(0, 10)}. Check /usage to see how much is left. ` +
+    ? [`Your ${billing.label} expire on ${expires.toISOString().slice(0, 10)}.`, billing.checkHint, ""].filter((x) => x !== undefined).join(" ") +
       (donating
         ? `Whatever you do not use, up to $${c.daily_usd} a day, will be donated to open source in the last ${c.lead_days} days.`
         : "Credits are not set to be donated, so anything unused will be lost.")

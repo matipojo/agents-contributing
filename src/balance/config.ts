@@ -15,7 +15,7 @@ export interface ContributorConfig {
     donate_fraction: number;
     min_surplus_pct: number;
   };
-  /** What may be donated: "subscription" (the usage windows) and/or "credits" (cloud credits). */
+  /** What may be donated: "subscription" (the usage windows) and/or "credits" (a credit pool, such as Claude cloud session credits). */
   donate: string[];
   credits: {
     lead_days: number;      // start donating credits this many days before they expire

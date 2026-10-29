@@ -80,3 +80,4 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 49. We decided each help type is its own top-level field, such as `help_triage`, instead of an entry under a `help` map, because a flat file is easier to read, edit and diff than deep nesting.
 50. We decided a help type may set its own limits, and any limit it leaves out falls back to the top-level one, because an owner may want riskier help types to move slower without repeating every limit.
 51. We decided `forbidden_paths` can also be set at the top level, and a help type's own list only adds to it, because a path like `.github/` should be protected for every help type and a narrower list must never unprotect it.
+54. We decided to add an `audit` help type whose output is an `issue`, one per finding, because finding bugs is help a repository can ask for, and opening an issue needs no permissions. The owner still picks what gets fixed, by labeling the issue for `help_pr`.

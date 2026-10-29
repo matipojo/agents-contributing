@@ -72,3 +72,14 @@ test("top-level forbidden_paths apply to every help type and add to its own", ()
   assert.ok(r.data);
   assert.deepEqual(effectiveForbiddenPaths(r.data, "pr"), [".github/", "package.json"]);
 });
+
+test("help_audit with an issue output is valid and known", () => {
+  const r = validateText([
+    "---", "version: 1",
+    "help_audit:", "  enabled: true", "  scope: path:src/", "  output: issue",
+    "limits:", "  max_open_agent_contributions: 3", "  max_per_contributor_per_week: 1", "  cooldown_hours: 24",
+    "---", "",
+  ].join("\n"));
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings, []);
+});

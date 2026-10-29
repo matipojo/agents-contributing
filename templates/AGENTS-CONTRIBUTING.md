@@ -28,6 +28,10 @@ help_review:
   enabled: false
   scope: label:agent-review
   output: review
+help_audit:
+  enabled: false
+  scope: path:src/
+  output: issue
 limits:
   max_open_agent_contributions: 3
   max_per_contributor_per_week: 1

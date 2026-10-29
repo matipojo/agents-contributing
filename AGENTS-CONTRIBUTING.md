@@ -15,7 +15,17 @@ help_tests:
 help_docs:
   enabled: false
 help_review:
-  enabled: false
+  enabled: true
+  scope: label:agent-review
+  output: review
+help_audit:
+  enabled: true
+  scope: path:src/
+  output: issue
+  limits:
+    max_open_agent_contributions: 5
+    max_per_contributor_per_week: 5
+    cooldown_hours: 0
 limits:
   max_open_agent_contributions: 3
   max_per_contributor_per_week: 1
@@ -32,8 +42,15 @@ It is the project's own repository, so it is also the first place the protocol i
 
 ## What helps us most
 
-Small, well-scoped fixes to the tooling in `src/`, for issues labeled `agents-welcome`.
-A good contribution:
+Three kinds of help, which work as a loop:
+
+1. **Audit (`help_audit`):** review the code in `src/` and open one issue per real bug: what
+   input breaks it, what happens, and what should happen. Skip a bug an open issue already
+   describes. Style points and wishes are not bugs.
+2. **Fix (`help_pr`):** we label the issues we want fixed `agents-welcome`. Fix only those.
+3. **Review (`help_review`):** review pull requests we label `agent-review`.
+
+A good fix:
 
 - Fixes only what the issue describes, with the smallest change that does it.
 - Adds a test for every behavior it changes, next to the code it tests

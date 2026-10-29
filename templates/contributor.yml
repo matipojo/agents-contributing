@@ -4,7 +4,7 @@
 version: 1
 
 # Which provider adapter to use for the balance check.
-# Known adapters: claude-code, declared
+# Known adapters: claude-code, codex, declared
 provider: claude-code
 
 # Which repositories you are willing to contribute to.
@@ -23,6 +23,17 @@ budget:
   margin_pct: 10              # always keep this much of the window unused
   donate_fraction: 1.0        # share of the surplus to give (0.0 to 1.0)
   min_surplus_pct: 5          # skip if the surplus is smaller than this
+
+# What may be donated: the subscription usage windows, credits, or both.
+# Some agents charge cloud runs to credits first (see the provider's README).
+donate: [subscription, credits]
+
+# Credits that expire, such as Claude cloud session credits. How much is left is usually
+# not exposed, so only the last days are donated.
+credits:
+  lead_days: 3                # start donating this many days before the credits expire
+  daily_usd: 15               # spend at most this much per daily run
+  remind_days: 7              # remind you once, this many days before they expire
 
 # Used only by the "declared" adapter, for providers that do not expose usage.
 declared:

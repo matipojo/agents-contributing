@@ -24,6 +24,8 @@ export interface ContributorConfig {
   };
   declared: { timezone: string; weekly_reset: string };
   log: boolean;
+  /** The contributor's runner repository. Default: <login>/agents-contributing-runner. */
+  runner_repo?: string;
 }
 
 export const HOME = process.env.AGENTS_CONTRIBUTING_HOME ?? join(homedir(), ".agents-contributing");

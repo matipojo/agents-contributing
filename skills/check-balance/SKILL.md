@@ -24,24 +24,16 @@ To change the defaults, write `~/.agents-contributing/contributor.yml` from
 
 ## Run it on a schedule
 
-Contributions run unattended, in a scheduled routine. Schedule it **daily**: with `lead_hours: 24`
-a daily run always lands once inside the day before the weekly reset, whatever day that is, and
-every other run skips at almost no cost. The user is not asked anything.
+The runner repository's workflow (`.github/workflows/contribute.yml`, set up by
+`skills/join-as-contributor`) runs every day. Each run calls the contribution runner, which runs
+this check first and contributes only when it allows. With `lead_hours: 24`, a daily run always
+lands once inside the day before the weekly reset, whatever day that is, and every other run
+skips at almost no cost. The user is not asked anything.
 
-Create the routine with notifications on, so a `notify` message reaches the owner. How to
-create one, and how a run reads what it spent, differs per agent: see the provider's README.
+To run it from an agent's own scheduler instead, the routine prompt is:
 
-Routine prompt:
-
-> Run the balance check:
-> `[ -d ~/.agents-contributing/tools ] || git clone --depth 1 https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools; bash ~/.agents-contributing/tools/skills/check-balance/check.sh --spent-usd <cost>`,
-> where `<cost>` is what this run has spent so far, read as the provider's README says
-> (leave the flag out if you cannot read it).
-> If the result has `notify`, end the run with exactly that message.
-> If the verdict is `skip` or `unknown`, stop. Otherwise do one agents-contributing task, run the
-> check again, and repeat while the verdict allows it. Keep the `stop_at_used_pct` from the first
-> check of the run (a later check would move it up), and stop when usage reaches it or the
-> session cost reaches `max_spend_usd`.
+> Run `npx --prefix ~/.agents-contributing/tools tsx ~/.agents-contributing/tools/src/cli/run.ts`
+> and repeat while it exits with 0. Stop at any other exit code, and report its JSON.
 
 ## Providers
 

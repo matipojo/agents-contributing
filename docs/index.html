@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agents-contributing</title>
+<meta name="description" content="Donate the unused part of your AI subscription to open source repositories that ask for help.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F2F4F7;
+  --surface: #FFFFFF;
+  --ink: #14213D;
+  --muted: #5C677D;
+  --line: #D5DBE5;
+  --used: #B9C3D3;
+  --reserve: #E9B44C;
+  --donated: #1F9D74;
+  --donated-ink: #137155;
+  --code-bg: #E7EBF1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1729;
+    --surface: #16213A;
+    --ink: #E6EAF2;
+    --muted: #9AA6BD;
+    --line: #2A3754;
+    --used: #3A4A6B;
+    --reserve: #D9A23A;
+    --donated: #34C493;
+    --donated-ink: #5BD9AC;
+    --code-bg: #1B2843;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1729; --surface: #16213A; --ink: #E6EAF2; --muted: #9AA6BD; --line: #2A3754;
+  --used: #3A4A6B; --reserve: #D9A23A; --donated: #34C493; --donated-ink: #5BD9AC; --code-bg: #1B2843;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 17px/1.6 "Schibsted Grotesk", system-ui, sans-serif;
+}
+a { color: var(--donated-ink); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--reserve); outline-offset: 2px; border-radius: 2px; }
+code, pre { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 14px; }
+:not(pre) > code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+pre {
+  background: var(--code-bg);
+  padding: 16px 18px;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+
+header.site {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 24px 0 0;
+}
+.wordmark { font-weight: 800; letter-spacing: -0.01em; font-size: 18px; color: var(--ink); text-decoration: none; }
+nav.site a { color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 15px; }
+nav.site a:hover { color: var(--ink); }
+
+/* Hero */
+.hero { padding: 72px 0 24px; }
+.hero h1 {
+  font-weight: 800;
+  font-size: clamp(38px, 7vw, 64px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  margin: 0 0 20px;
+  max-width: 14ch;
+}
+.hero p.lede { font-size: 20px; line-height: 1.5; color: var(--muted); margin: 0; max-width: 56ch; }
+
+/* The meter: one weekly window */
+.meter { margin: 48px 0 8px; }
+.meter-bar {
+  display: flex; height: 56px; border-radius: 6px; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.seg { height: 100%; width: 0; transition: width 900ms cubic-bezier(.2,.7,.2,1); }
+.seg.used { background: var(--used); }
+.seg.donated {
+  background: repeating-linear-gradient(-45deg, var(--donated) 0 10px, color-mix(in srgb, var(--donated) 82%, white) 10px 20px);
+}
+.seg.reserve { background: var(--reserve); }
+.meter.go .seg.used { width: 41%; transition-delay: 100ms; }
+.meter.go .seg.donated { width: 49%; transition-delay: 900ms; }
+.meter.go .seg.reserve { width: 10%; transition-delay: 600ms; }
+.meter-legend {
+  display: flex; flex-wrap: wrap; gap: 6px 24px; margin-top: 14px; font-size: 15px; color: var(--muted);
+}
+.meter-legend span::before {
+  content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 2px;
+  margin-right: 8px; vertical-align: -1px;
+}
+.k-used::before { background: var(--used); }
+.k-donated::before { background: var(--donated); }
+.k-reserve::before { background: var(--reserve); }
+.meter-axis { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .seg { transition: none; } }
+
+section { padding: 56px 0 0; }
+h2 { font-size: 30px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 800; margin: 0 0 16px; }
+h3 { font-size: 20px; line-height: 1.3; font-weight: 700; margin: 0 0 8px; }
+p { margin: 0 0 16px; max-width: 68ch; }
+.muted { color: var(--muted); }
+
+/* Steps: a real sequence */
+ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 24px 0 0; }
+ol.steps li {
+  counter-increment: s; position: relative; padding: 0 0 22px 52px; border-left: 2px solid var(--line); margin-left: 15px;
+}
+ol.steps li:last-child { border-left-color: transparent; padding-bottom: 0; }
+ol.steps li::before {
+  content: counter(s); position: absolute; left: -16px; top: -2px;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--ink); color: var(--bg); font-weight: 700; font-size: 15px;
+  display: grid; place-items: center;
+}
+ol.steps p { margin-bottom: 0; }
+
+/* Two paths */
+.paths { display: grid; grid-template-columns: 1fr; gap: 40px; margin-top: 8px; }
+@media (min-width: 760px) { .paths { grid-template-columns: 1fr 1fr; gap: 40px; } }
+.path { display: flex; flex-direction: column; align-items: flex-start; }
+.path h3 { font-size: 22px; }
+.path ul { padding-left: 20px; margin: 0 0 16px; flex: 1; }
+.path li { margin-bottom: 6px; }
+.ask {
+  border-left: 3px solid var(--donated); padding: 10px 14px; background: var(--surface);
+  border-radius: 0 6px 6px 0; font-size: 16px; margin: 12px 0 0;
+}
+
+.defaults { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 8px; border-top: 1px solid var(--line); }
+.defaults div { padding: 16px 0; border-bottom: 1px solid var(--line); }
+@media (min-width: 640px) {
+  .defaults div { display: grid; grid-template-columns: 220px 1fr; gap: 24px; }
+}
+.defaults strong { font-weight: 700; }
+.defaults p { margin: 0; }
+
+.example { margin-top: 20px; }
+
+footer.site { padding: 72px 0 48px; color: var(--muted); font-size: 15px; }
+footer.site p { margin: 0 0 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="site">
+  <a class="wordmark" href="./">agents-contributing</a>
+  <nav class="site" aria-label="Main">
+    <a href="https://github.com/OWNER/agents-contributing/blob/main/SPEC.md">Spec</a>
+    <a href="https://github.com/OWNER/agents-contributing">GitHub</a>
+  </nav>
+</header>
+
+<main>
+<div class="hero">
+  <h1>Give the rest of your week to open source.</h1>
+  <p class="lede">Most AI subscriptions reset every week, and most people never use all of it.
+  agents-contributing lets your agent spend what is left on repositories that asked for help,
+  right before it would have expired.</p>
+
+  <figure class="meter" id="meter" aria-label="One weekly usage window: 41% used, 49% donated, 10% kept in reserve">
+    <div class="meter-bar">
+      <div class="seg used"></div>
+      <div class="seg donated"></div>
+      <div class="seg reserve"></div>
+    </div>
+    <div class="meter-axis" aria-hidden="true"><span>Window opens</span><span>Resets</span></div>
+    <figcaption class="meter-legend">
+      <span class="k-used">Your own work</span>
+      <span class="k-donated">Donated before the reset</span>
+      <span class="k-reserve">Always kept for you</span>
+    </figcaption>
+  </figure>
+</div>
+
+<section id="how" aria-labelledby="how-h">
+  <h2 id="how-h">How it works</h2>
+  <p class="muted">No server, no platform, no central account. Just a file in each repository and a runner that respects it.</p>
+  <ol class="steps">
+    <li>
+      <h3>A repository asks for help</h3>
+      <p>The owner adds <code>AGENTS-CONTRIBUTING.md</code> and says exactly what kind of help is welcome:
+      reproducing bugs, triaging issues, writing tests, fixing small issues. Only issues they label are in scope.</p>
+    </li>
+    <li>
+      <h3>Your agent notices leftover capacity</h3>
+      <p>A day before your weekly window resets, the balance check looks at how much is left.
+      It keeps a reserve for you and only offers what would otherwise be lost.</p>
+    </li>
+    <li>
+      <h3>It sends a contribution, and stops</h3>
+      <p>A comment, a failing test, or a pull request, marked as agent work.
+      The owner reviews it like any other contribution and merges what they want.</p>
+    </li>
+  </ol>
+</section>
+
+<section id="start" aria-labelledby="start-h">
+  <h2 id="start-h">Get started</h2>
+  <p class="muted">Each path is a skill your agent can follow. Point your agent at it and answer its questions.</p>
+  <div class="paths">
+    <div class="path">
+      <h3>I maintain a repository</h3>
+      <ul>
+        <li>Choose which kinds of help you want.</li>
+        <li>Pick the labels that make an issue available.</li>
+        <li>Set limits on how many agent contributions you accept.</li>
+      </ul>
+      <a href="https://github.com/OWNER/agents-contributing/blob/main/skills/setup-repo/SKILL.md">Read the setup skill</a>
+      <p class="ask">“Set up this repo for agents-contributing using skills/setup-repo/SKILL.md.”</p>
+    </div>
+    <div class="path">
+      <h3>I have leftover AI usage</h3>
+      <ul>
+        <li>Choose which repositories and kinds of help you want to support.</li>
+        <li>Decide how much to keep and how much to give.</li>
+        <li>Get a runner repository that is closed to spam.</li>
+      </ul>
+      <a href="https://github.com/OWNER/agents-contributing/blob/main/skills/join-as-contributor/SKILL.md">Read the join skill</a>
+      <p class="ask">“Join agents-contributing using skills/join-as-contributor/SKILL.md.”</p>
+    </div>
+  </div>
+
+  <div class="example">
+    <h3>What a repository writes</h3>
+    <p class="muted">A short block at the top of <code>AGENTS-CONTRIBUTING.md</code>. Everything not listed stays closed.</p>
+<pre><code>---
+version: 1
+help:
+  reproduce:
+    enabled: true
+    scope: label:needs-repro
+    output: failing-test-pr
+    forbidden_paths: [.github/]
+    max_diff_lines: 150
+limits:
+  max_open_agent_contributions: 3
+  max_per_contributor_per_week: 1
+  cooldown_hours: 24
+---</code></pre>
+  </div>
+</section>
+
+<section id="defaults" aria-labelledby="defaults-h">
+  <h2 id="defaults-h">Closed by default</h2>
+  <div class="defaults">
+    <div><strong>No file, no contributions</strong><p>A repository without <code>AGENTS-CONTRIBUTING.md</code> is never touched. Every kind of help starts disabled and needs a label or path to apply to.</p></div>
+    <div><strong>The owner decides</strong><p>Agents only comment or open pull requests. Nothing is merged, labeled or closed for you. Mark anything unwanted with <code>agent-spam</code> and runners back off.</p></div>
+    <div><strong>Your work comes first</strong><p>The runner only starts close to the reset, keeps a reserve, and stops at the first limit message from your provider.</p></div>
+    <div><strong>Runners are sandboxed</strong><p>Everything read from another repository is treated as data, not instructions. Runs are isolated, and network access is limited to your AI provider and GitHub.</p></div>
+    <div><strong>Runner repositories are closed too</strong><p>Your runner repository has issues and outside interaction turned off, and no compliant agent will ever contribute to it.</p></div>
+    <div><strong>Your plan stays private</strong><p>Contributions are marked with provider and model, never token counts or plan details.</p></div>
+  </div>
+</section>
+
+<section id="before" aria-labelledby="before-h">
+  <h2 id="before-h">Before you join</h2>
+  <p>Subscriptions are meant for personal use. Check your provider’s terms before running yours on other people’s repositories, and never share an account or token with anyone.</p>
+</section>
+</main>
+
+<footer class="site">
+  <p>An open protocol. MIT licensed.</p>
+  <p><a href="https://github.com/OWNER/agents-contributing/blob/main/SPEC.md">Read the full spec</a></p>
+</footer>
+
+</div>
+<script>
+  // One orchestrated moment: fill the weekly meter once on load.
+  requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById("meter").classList.add("go")));
+</script>
+</body>
+</html>

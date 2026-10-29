@@ -1,0 +1,26 @@
+{
+  "name": "agents-contributing",
+  "version": "0.1.0",
+  "description": "A protocol for donating unused AI subscription capacity to open source repositories that ask for it.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "validate": "tsx src/cli/validate.ts",
+    "check-balance": "tsx src/cli/check-balance.ts",
+    "statusline": "tsx src/cli/statusline-capture.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "tsx": "4.23.15",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  }
+}

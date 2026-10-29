@@ -7,13 +7,19 @@ export const KNOWN_TYPES = new Set([
 export const OUTPUTS = new Set(["comment", "pr", "review", "failing-test-pr"]);
 const CODE_OUTPUTS = new Set(["pr", "failing-test-pr"]);
 const REQUIRE_VALUES = new Set(["tests", "disclosure", "changelog"]);
-const HELP_FIELDS = new Set(["enabled", "scope", "output", "require", "forbidden_paths", "max_diff_lines"]);
+const HELP_FIELDS = new Set(["enabled", "scope", "output", "require", "forbidden_paths", "max_diff_lines", "limits"]);
 const LIMIT_FIELDS = ["max_open_agent_contributions", "max_per_contributor_per_week", "cooldown_hours"] as const;
 const TOP_FIELDS = new Set(["version", "limits", "contact", "providers"]);
 export const HELP_PREFIX = "help_";
 const SCOPE_RE = /^(label|path):\S+$/;
 
 export type Output = "comment" | "pr" | "review" | "failing-test-pr";
+
+export interface Limits {
+  max_open_agent_contributions: number;
+  max_per_contributor_per_week: number;
+  cooldown_hours: number;
+}
 
 export interface HelpType {
   enabled?: boolean;
@@ -22,16 +28,13 @@ export interface HelpType {
   require?: string[];
   forbidden_paths?: string[];
   max_diff_lines?: number;
+  limits?: Partial<Limits>;
 }
 
 export interface AgentsContributing {
   version: number;
   [helpType: `help_${string}`]: HelpType;
-  limits: {
-    max_open_agent_contributions: number;
-    max_per_contributor_per_week: number;
-    cooldown_hours: number;
-  };
+  limits: Limits;
   contact?: string;
   providers?: { allow?: string[]; deny?: string[] };
 }
@@ -151,6 +154,14 @@ export function validateData(data: unknown): ValidationResult {
       warnings.push(`${where}: produces code but does not forbid '.github/'. Workflow changes are the riskiest kind.`);
     }
 
+    if (cfg.limits !== undefined) {
+      if (!isRecord(cfg.limits)) {
+        errors.push(`${where}.limits: must be a mapping.`);
+      } else {
+        checkLimits(cfg.limits, `${where}.limits`, false, errors, warnings);
+      }
+    }
+
     const mdl = cfg.max_diff_lines;
     if (mdl !== undefined && !(isNonNegInt(mdl) && mdl > 0)) {
       errors.push(`${where}.max_diff_lines: must be a positive integer.`);
@@ -166,15 +177,7 @@ export function validateData(data: unknown): ValidationResult {
   if (!isRecord(data.limits)) {
     errors.push("Missing 'limits' map.");
   } else {
-    const limits = data.limits;
-    for (const key of LIMIT_FIELDS) {
-      const val = limits[key];
-      if (val === undefined) errors.push(`limits.${key}: required.`);
-      else if (!isNonNegInt(val)) errors.push(`limits.${key}: must be a non-negative integer.`);
-    }
-    for (const key of Object.keys(limits)) {
-      if (!(LIMIT_FIELDS as readonly string[]).includes(key)) warnings.push(`limits: unknown field '${key}'.`);
-    }
+    checkLimits(data.limits, "limits", true, errors, warnings);
   }
 
   const providers = data.providers;
@@ -188,6 +191,27 @@ export function validateData(data: unknown): ValidationResult {
   return errors.length === 0
     ? { errors, warnings, data: data as unknown as AgentsContributing }
     : { errors, warnings };
+}
+
+function checkLimits(
+  limits: Record<string, unknown>, where: string, required: boolean, errors: string[], warnings: string[],
+): void {
+  for (const key of LIMIT_FIELDS) {
+    const val = limits[key];
+    if (val === undefined) {
+      if (required) errors.push(`${where}.${key}: required.`);
+    } else if (!isNonNegInt(val)) {
+      errors.push(`${where}.${key}: must be a non-negative integer.`);
+    }
+  }
+  for (const key of Object.keys(limits)) {
+    if (!(LIMIT_FIELDS as readonly string[]).includes(key)) warnings.push(`${where}: unknown field '${key}'.`);
+  }
+}
+
+/** The limits that apply to one help type: its own limits, with each missing field taken from the top-level limits. */
+export function effectiveLimits(data: AgentsContributing, type: string): Limits {
+  return { ...data.limits, ...data[`${HELP_PREFIX}${type}`]?.limits };
 }
 
 /** The marker line every contribution must end with. */

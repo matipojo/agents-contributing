@@ -78,3 +78,4 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 47. We decided the Claude Code adapter reads usage from the status line, because Claude Code passes usage percentage and reset times there on subscription plans.
 48. We decided usage readings older than 30 minutes are marked stale, because usage only grows inside a window and an old reading overstates the surplus.
 49. We decided each help type is its own top-level field, such as `help_triage`, instead of an entry under a `help` map, because a flat file is easier to read, edit and diff than deep nesting.
+50. We decided a help type may set its own limits, and any limit it leaves out falls back to the top-level one, because an owner may want riskier help types to move slower without repeating every limit.

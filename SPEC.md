@@ -39,6 +39,7 @@ Each help type is its own top-level field named `help_` followed by the type nam
 | `require` | Requirements, for example `tests`, `disclosure`, `changelog`. |
 | `forbidden_paths` | Files and directories that must not be touched. |
 | `max_diff_lines` | Maximum size of a change. |
+| `limits` | Limits for this help type only (see Limits). |
 
 ### Known help types
 
@@ -63,11 +64,13 @@ A repository may define a help type not on this list, as `help_<name>`. A runner
 | `max_per_contributor_per_week` | How many contributions per account per week. |
 | `cooldown_hours` | Minimum time between two contributions from the same account. |
 
+The top-level `limits` is required and applies to every help type. A help type may also set its own `limits` with any of the same fields. A field set on the help type replaces the top-level value for that type, counting only contributions of that type. A field the help type leaves out, or a help type without `limits`, falls back to the top-level value.
+
 ## Obligations of a compliant runner
 
 1. Never contribute to a repository without the file or to a runner repository, and re-read the file right before every submission.
 2. Skip a repository whose `version` the runner does not know.
-3. Respect all limits, `scope`, `forbidden_paths` and `max_diff_lines`.
+3. Respect all limits, both top-level and per help type, `scope`, `forbidden_paths` and `max_diff_lines`.
 4. Produce only the configured output type, and never an action that requires permissions in the repository.
 5. Open a draft PR as soon as code work starts, and skip a task that already has an agent draft.
 6. Skip an issue that already has an agent comment of the same help type.
@@ -143,6 +146,8 @@ help_pr:
   require: [tests, disclosure]
   forbidden_paths: [.github/, package.json, package-lock.json]
   max_diff_lines: 300
+  limits:
+    max_open_agent_contributions: 2
 help_review:
   enabled: false
 limits:

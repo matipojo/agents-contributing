@@ -48,7 +48,8 @@ Ask in plain words, one short list. Recommend starting small:
 If the owner has no preference, propose `reproduce` only, scoped to a label.
 
 Also ask for limits. Defaults to propose: 3 open agent contributions, 1 per contributor per week,
-24 hour cooldown.
+24 hour cooldown. If the owner wants one help type to move slower (for example `help_pr`),
+set only those limits under that type's own `limits`; the rest fall back to the top-level limits.
 
 ### 3. Write the file
 

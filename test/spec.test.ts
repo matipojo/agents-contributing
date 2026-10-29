@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validateText } from "../src/spec.ts";
+import { effectiveLimits, validateText } from "../src/spec.ts";
 
 test("the template is valid with no warnings", () => {
   const r = validateText(readFileSync("templates/AGENTS-CONTRIBUTING.md", "utf8"));
@@ -33,4 +33,28 @@ test("a nested 'help' map is rejected", () => {
   const r = validateText("---\nversion: 1\nhelp:\n  pr:\n    enabled: false\nlimits: {}\n---\n");
   assert.ok(r.errors.some((e) => e.includes("'help' is not a field")));
   assert.ok(r.errors.some((e) => e.includes("No help type defined")));
+});
+
+test("a help type's own limits override the top-level ones field by field", () => {
+  const r = validateText([
+    "---", "version: 1",
+    "help_pr:", "  enabled: false", "  limits:", "    cooldown_hours: 72",
+    "help_triage:", "  enabled: false",
+    "limits:", "  max_open_agent_contributions: 3", "  max_per_contributor_per_week: 1", "  cooldown_hours: 24", "---",
+  ].join("\n"));
+  assert.deepEqual(r.errors, []);
+  assert.ok(r.data);
+  assert.deepEqual(effectiveLimits(r.data, "pr"),
+    { max_open_agent_contributions: 3, max_per_contributor_per_week: 1, cooldown_hours: 72 });
+  assert.deepEqual(effectiveLimits(r.data, "triage"),
+    { max_open_agent_contributions: 3, max_per_contributor_per_week: 1, cooldown_hours: 24 });
+});
+
+test("invalid per-type limits are errors", () => {
+  const r = validateText([
+    "---", "version: 1",
+    "help_pr:", "  enabled: true", "  scope: label:x", "  output: comment", "  limits:", "    cooldown_hours: -1",
+    "limits:", "  max_open_agent_contributions: 3", "  max_per_contributor_per_week: 1", "  cooldown_hours: 24", "---",
+  ].join("\n"));
+  assert.ok(r.errors.some((e) => e.includes("help_pr.limits.cooldown_hours")));
 });

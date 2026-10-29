@@ -22,7 +22,10 @@ Tell the user two things plainly, and continue only if they agree:
 2. **Security.** Their agent will read content written by strangers. Contributions must run
    in an isolated environment with no access to their files or secrets.
 
-Check prerequisites: `gh auth status`, `node --version` (20 or later), `git --version`.
+Check prerequisites: `node --version` (20 or later), `git --version`, and `gh auth status`.
+`gh` must be allowed to create a repository in the user's account and change its settings
+(step 4). If it is not, still do steps 1 to 3 and 5, and give the user the step 4 commands to run
+themselves.
 
 ## Steps
 
@@ -38,13 +41,19 @@ npm --prefix ~/.agents-contributing/tools install --silent
 Copy `~/.agents-contributing/tools/templates/contributor.yml` to
 `~/.agents-contributing/contributor.yml`, then ask the user and fill in:
 
-- **provider:** `claude-code` if they use Claude Code on a subscription. It reads usage by
-  itself, so ask nothing more. Otherwise `declared`.
+- **provider:** the agent they will donate from. Each one has a README under
+  `~/.agents-contributing/tools/src/balance/adapters/`:
+  - `claude-code`: Claude Code on a subscription.
+  - `codex`: the Codex CLI signed in with ChatGPT.
+  - `declared`: any other agent. Only this one needs the `declared` fields below.
+
+  `claude-code` and `codex` read usage by themselves, so ask nothing more about it.
 - **targets:** specific repositories they care about, and/or topics. Default: the
   `agents-contributing` topic only.
 - **help_types:** what they are willing to do. Suggest `reproduce`, `triage`, `tests`, `docs`.
-- **donate:** what they give: their subscription's weekly surplus, their cloud session credits
-  that are about to expire, or both (default). Cloud routines spend credits first.
+  `audit`, `pr` and `review` are also known help types.
+- **donate:** what they give: `subscription` (the weekly surplus), `credits` (credits that are
+  about to expire, where the provider has them), or both (default).
 - **budget:** how close to the reset to start (`lead_hours`), how much to always keep
   (`margin_pct`), and what share of the surplus to give (`donate_fraction`). Defaults are safe.
 - **declared:** only for `declared`. Ask when their weekly limit resets, and their time zone.
@@ -52,8 +61,12 @@ Copy `~/.agents-contributing/tools/templates/contributor.yml` to
 ### 3. Set up the balance check
 
 Run `bash ~/.agents-contributing/tools/skills/check-balance/check.sh` once and show the user the
-result. Then create the daily routine described in `skills/check-balance/SKILL.md` under
-"Run it on a schedule". From then on the balance is checked and used without the user.
+result. `skip` is a normal result: it means it is not yet time to donate.
+
+Then create the daily routine described in `skills/check-balance/SKILL.md` under
+"Run it on a schedule", with the scheduler the agent has (for example a Claude Code routine).
+If the agent cannot schedule anything, save the routine prompt to
+`~/.agents-contributing/daily-routine.md` and tell the user how often to run it.
 
 ### 4. Create the runner repository
 
@@ -84,7 +97,13 @@ will get no attribution.
 ### 5. Find repositories to help
 
 ```bash
-gh search repos --topic agents-contributing --limit 50 --json fullName,repositoryTopics
+gh search repos --topic agents-contributing --limit 50 --json fullName --jq '.[].fullName'
+```
+
+`gh search repos` does not return topics, so read them per repository:
+
+```bash
+gh repo view OWNER/NAME --json repositoryTopics --jq '.repositoryTopics[].name'
 ```
 
 For each result:

@@ -15,6 +15,8 @@ const cfg: ContributorConfig = {
   targets: { repos: [], topics: ["agents-contributing"] },
   help_types: ["reproduce"],
   budget: { window: "seven_day", lead_hours: 24, margin_pct: 10, donate_fraction: 1, min_surplus_pct: 5 },
+  donate: ["subscription", "credits"],
+  credits: { lead_days: 3, daily_usd: 15, remind_days: 7 },
   declared: { timezone: "UTC", weekly_reset: "sun 00:00" },
   log: true,
 };
@@ -114,15 +116,41 @@ const credits = (expiresIn: number, extra: Partial<NonNullable<UsageReading["bil
 });
 
 test("cloud credits far from expiry: skip, even with a weekly surplus near its reset", () => {
-  const d = decide(cfg, credits(160), now);
+  const d = decide(cfg, credits(200), now);
   assert.equal(d.verdict, "skip");
   assert.match(d.reason, /cloud credits/);
+  assert.equal(d.notify, undefined);
 });
 
-test("cloud credits about to expire: contribute until limited", () => {
-  const d = decide(cfg, credits(12), now);
+test("cloud credits within lead_days: contribute up to the daily cap", () => {
+  const d = decide(cfg, credits(60), now, 2.5);
   assert.equal(d.verdict, "contribute-until-limited");
   assert.equal(d.window, "ccr_promotional");
+  assert.equal(d.max_spend_usd, 15);
+  assert.equal(d.spent_usd, 2.5);
+});
+
+test("cloud credits: stop once the run reaches the daily cap", () => {
+  const d = decide(cfg, credits(60), now, 15.2);
+  assert.equal(d.verdict, "skip");
+  assert.match(d.reason, /daily cap/);
+});
+
+test("cloud credits: remind the owner once, a week before they expire", () => {
+  assert.match(decide(cfg, credits(6.5 * 24), now).notify ?? "", /expire on .*\/usage/);
+  assert.equal(decide(cfg, credits(5.5 * 24), now).notify, undefined);
+  assert.equal(decide(cfg, credits(7.5 * 24), now).notify, undefined);
+});
+
+test("credits not in donate: skip, and the reminder says they will be lost", () => {
+  const d = decide({ ...cfg, donate: ["subscription"] }, credits(6.5 * 24), now);
+  assert.equal(d.verdict, "skip");
+  assert.match(d.notify ?? "", /lost/);
+  assert.equal(decide({ ...cfg, donate: ["subscription"] }, credits(12), now).verdict, "skip");
+});
+
+test("subscription not in donate: skip even with surplus", () => {
+  assert.equal(decide({ ...cfg, donate: ["credits"] }, reading(40, 10), now).verdict, "skip");
 });
 
 test("never spend paid extra usage", () => {

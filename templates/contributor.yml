@@ -24,6 +24,16 @@ budget:
   donate_fraction: 1.0        # share of the surplus to give (0.0 to 1.0)
   min_surplus_pct: 5          # skip if the surplus is smaller than this
 
+# What may be donated: the subscription usage windows, cloud session credits, or both.
+# Cloud routines are charged to credits first; the subscription is used once they run out.
+donate: [subscription, credits]
+
+# Cloud session credits. How much is left is not exposed, so only the last days are donated.
+credits:
+  lead_days: 3                # start donating this many days before the credits expire
+  daily_usd: 15               # spend at most this much per daily run
+  remind_days: 7              # remind you once, this many days before they expire
+
 # Used only by the "declared" adapter, for providers that do not expose usage.
 declared:
   timezone: UTC

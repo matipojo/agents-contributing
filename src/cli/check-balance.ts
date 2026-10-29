@@ -2,14 +2,19 @@
 /**
  * Decide whether there is unused subscription capacity to donate right now.
  *
- * Usage: npx tsx src/cli/check-balance.ts [path/to/contributor.yml]
+ * Usage: npx tsx src/cli/check-balance.ts [--spent-usd N] [path/to/contributor.yml]
+ * --spent-usd is what this run has spent so far, for the daily cap on cloud credits.
+ * Without it, the last cost recorded in this session's transcript is used.
  * Prints a JSON decision. Exit codes: 0 contribute, 10 skip, 2 unknown or error.
  */
 import { loadConfig, DEFAULT_CONFIG_PATH } from "../balance/config.ts";
-import { ADAPTERS } from "../balance/adapters.ts";
+import { ADAPTERS, sessionSpendUsd } from "../balance/adapters.ts";
 import { decide } from "../balance/decide.ts";
 
-const path = process.argv[2] ?? DEFAULT_CONFIG_PATH;
+const args = process.argv.slice(2);
+const spentAt = args.indexOf("--spent-usd");
+const spentArg = spentAt >= 0 ? Number(args.splice(spentAt, 2)[1]) : NaN;
+const path = args[0] ?? DEFAULT_CONFIG_PATH;
 const now = new Date();
 
 try {
@@ -19,7 +24,8 @@ try {
     throw new Error(`Unknown provider "${cfg.provider}". Known: ${Object.keys(ADAPTERS).join(", ")}.`);
   }
   const reading = adapter.read(cfg, now);
-  const decision = decide(cfg, reading, now);
+  const spent = Number.isFinite(spentArg) ? spentArg : sessionSpendUsd();
+  const decision = decide(cfg, reading, now, spent);
   console.log(JSON.stringify({
     provider: reading.provider,
     source: reading.source,

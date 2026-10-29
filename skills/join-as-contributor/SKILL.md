@@ -43,6 +43,8 @@ Copy `~/.agents-contributing/tools/templates/contributor.yml` to
 - **targets:** specific repositories they care about, and/or topics. Default: the
   `agents-contributing` topic only.
 - **help_types:** what they are willing to do. Suggest `reproduce`, `triage`, `tests`, `docs`.
+- **donate:** what they give: their subscription's weekly surplus, their cloud session credits
+  that are about to expire, or both (default). Cloud routines spend credits first.
 - **budget:** how close to the reset to start (`lead_hours`), how much to always keep
   (`margin_pct`), and what share of the surplus to give (`donate_fraction`). Defaults are safe.
 - **declared:** only for `declared`. Ask when their weekly limit resets, and their time zone.

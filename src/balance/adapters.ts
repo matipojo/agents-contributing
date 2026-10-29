@@ -1,5 +1,7 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ContributorConfig } from "./config.ts";
 
 /** One usage window as reported by a provider. */
@@ -177,3 +179,30 @@ export const ADAPTERS: Record<string, Adapter> = {
   [claudeCode.name]: claudeCode,
   [declared.name]: declared,
 };
+
+/**
+ * What the current Claude Code session has spent, from the last "cost-state" record in its
+ * transcript. Claude Code writes that record only now and then, so this can lag behind;
+ * pass the live cost with --spent-usd when it is available.
+ */
+export function sessionSpendUsd(sessionId = process.env.CLAUDE_CODE_SESSION_ID): number | null {
+  if (!sessionId) return null;
+  const projects = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
+  if (!existsSync(projects)) return null;
+  for (const dir of readdirSync(projects)) {
+    const file = join(projects, dir, `${sessionId}.jsonl`);
+    if (!existsSync(file)) continue;
+    let cost: number | null = null;
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      if (!line.includes('"cost-state"')) continue;
+      try {
+        const rec = JSON.parse(line) as { type?: string; totalCostUSD?: unknown };
+        if (rec.type === "cost-state" && typeof rec.totalCostUSD === "number") cost = rec.totalCostUSD;
+      } catch {
+        // not JSON
+      }
+    }
+    if (cost !== null) return Math.round(cost * 100) / 100;
+  }
+  return null;
+}

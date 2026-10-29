@@ -2,9 +2,9 @@ import { parse as parseYaml } from "yaml";
 
 export const KNOWN_VERSIONS = new Set([1]);
 export const KNOWN_TYPES = new Set([
-  "triage", "reproduce", "pr", "tests", "review", "docs", "translate", "answer",
+  "triage", "reproduce", "pr", "tests", "review", "docs", "translate", "answer", "audit",
 ]);
-export const OUTPUTS = new Set(["comment", "pr", "review", "failing-test-pr"]);
+export const OUTPUTS = new Set(["comment", "pr", "review", "failing-test-pr", "issue"]);
 const CODE_OUTPUTS = new Set(["pr", "failing-test-pr"]);
 const REQUIRE_VALUES = new Set(["tests", "disclosure", "changelog"]);
 const HELP_FIELDS = new Set(["enabled", "scope", "output", "require", "forbidden_paths", "max_diff_lines", "limits"]);
@@ -13,7 +13,7 @@ const TOP_FIELDS = new Set(["version", "limits", "forbidden_paths", "contact", "
 export const HELP_PREFIX = "help_";
 const SCOPE_RE = /^(label|path):\S+$/;
 
-export type Output = "comment" | "pr" | "review" | "failing-test-pr";
+export type Output = "comment" | "pr" | "review" | "failing-test-pr" | "issue";
 
 export interface Limits {
   max_open_agent_contributions: number;

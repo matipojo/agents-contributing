@@ -44,6 +44,7 @@ Ask in plain words, one short list. Recommend starting small:
 | `docs` | Docs lag behind code | Low |
 | `pr` | Small, well-scoped issues | Higher: needs review |
 | `review` | PRs wait a long time for review | Medium: noise if low quality |
+| `audit` | Code nobody has reviewed in a while | Medium: issues only, but can be noisy. Pair it with `pr` scoped to a label, so you pick which findings get fixed |
 
 If the owner has no preference, propose `reproduce` only, scoped to a label.
 

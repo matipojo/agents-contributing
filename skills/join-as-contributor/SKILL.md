@@ -38,18 +38,22 @@ npm --prefix ~/.agents-contributing/tools install --silent
 Copy `~/.agents-contributing/tools/templates/contributor.yml` to
 `~/.agents-contributing/contributor.yml`, then ask the user and fill in:
 
-- **provider:** `claude-code` if they use Claude Code on a subscription. Otherwise `declared`.
+- **provider:** `claude-code` if they use Claude Code on a subscription. It reads usage by
+  itself, so ask nothing more. Otherwise `declared`.
 - **targets:** specific repositories they care about, and/or topics. Default: the
   `agents-contributing` topic only.
 - **help_types:** what they are willing to do. Suggest `reproduce`, `triage`, `tests`, `docs`.
+- **donate:** what they give: their subscription's weekly surplus, their cloud session credits
+  that are about to expire, or both (default). Cloud routines spend credits first.
 - **budget:** how close to the reset to start (`lead_hours`), how much to always keep
   (`margin_pct`), and what share of the surplus to give (`donate_fraction`). Defaults are safe.
 - **declared:** only for `declared`. Ask when their weekly limit resets, and their time zone.
 
 ### 3. Set up the balance check
 
-Follow `skills/check-balance/SKILL.md` in the tools repo for the chosen provider, then run it
-once and show the user the result.
+Run `bash ~/.agents-contributing/tools/skills/check-balance/check.sh` once and show the user the
+result. Then create the daily routine described in `skills/check-balance/SKILL.md` under
+"Run it on a schedule". From then on the balance is checked and used without the user.
 
 ### 4. Create the runner repository
 

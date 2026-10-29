@@ -75,8 +75,12 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 ## Implementation
 
 46. We decided all tooling is TypeScript only, because one language keeps the tools simple to read and contribute to.
-47. We decided the Claude Code adapter reads usage from the status line, because Claude Code passes usage percentage and reset times there on subscription plans.
-48. We decided usage readings older than 30 minutes are marked stale, because usage only grows inside a window and an old reading overstates the surplus.
+47. We decided the Claude Code adapter reads usage from a tiny headless `claude -p` request, because contributions run in scheduled routines where no status line is ever drawn, and Claude Code reports the usage windows for every request.
+48. We decided every check reads usage fresh and never from a cache, and nothing is installed in the contributor's day-to-day setup, because usage only grows inside a window, an old reading overstates the surplus, and the routine is the only place the project runs.
 49. We decided each help type is its own top-level field, such as `help_triage`, instead of an entry under a `help` map, because a flat file is easier to read, edit and diff than deep nesting.
 50. We decided a help type may set its own limits, and any limit it leaves out falls back to the top-level one, because an owner may want riskier help types to move slower without repeating every limit.
 51. We decided `forbidden_paths` can also be set at the top level, and a help type's own list only adds to it, because a path like `.github/` should be protected for every help type and a narrower list must never unprotect it.
+50. We decided the balance check needs no config and no answers from the user, and the routine runs daily, because a daily run always lands once in the day before the weekly reset, whatever day the reset is.
+51. We decided that when a run is charged to cloud credits instead of the subscription, the check protects the credits: it contributes only within `lead_hours` before they expire, and never when paid extra usage is being spent. Because cloud work does not move the subscription windows, so a weekly surplus would never stop the run, and the remaining credit amount is not exposed.
+52. We decided the contributor chooses whether to donate the subscription, cloud credits or both, because they are two different pools and only the contributor knows what they still need.
+53. We decided credits are donated only in the last three days before they expire, at most $15 per daily run, and the owner gets one reminder a week before, because the remaining amount is not exposed and a large unused balance cannot be spent usefully in the last day.

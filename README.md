@@ -49,8 +49,7 @@ npm test
 | `src/spec.ts` | Spec types, validation and the contribution marker |
 | `src/cli/validate.ts` | Validator for `AGENTS-CONTRIBUTING.md` |
 | `src/cli/check-balance.ts` | Balance check, prints a JSON decision |
-| `src/cli/statusline-capture.ts` | Claude Code status line command that records usage limits |
-| `src/balance/` | Provider adapters and the decision logic |
+| `src/balance/` | The decision logic, and `adapters/`: one folder per agent type |
 | `templates/` | Starting points for `AGENTS-CONTRIBUTING.md` and `contributor.yml` |
 | `docs/` | The GitHub Pages site and the design decisions |
 
@@ -58,10 +57,12 @@ npm test
 
 | Adapter | How it reads usage |
 |---|---|
-| `claude-code` | Usage percentage and reset time from the Claude Code status line |
+| `claude-code` | Real usage and reset times from a tiny headless `claude -p` request. Works in scheduled routines |
+| `codex` | Real usage and reset times from a tiny `codex exec` turn and its session file |
 | `declared` | No usage, only a declared weekly reset time. Contributes until the provider refuses |
 
-Adding a provider means adding one adapter in `src/balance/adapters.ts`.
+Each adapter has its own folder under `src/balance/adapters/`, with its code, tests and README.
+Adding an agent means adding a folder; see [`src/balance/adapters/README.md`](src/balance/adapters/README.md).
 
 ## Before you join
 

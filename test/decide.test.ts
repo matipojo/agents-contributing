@@ -111,3 +111,22 @@ test("never spend paid extra usage", () => {
 test("a pool that refuses requests means skip", () => {
   assert.equal(decide(cfg, credits(12, { allowed: false }), now).verdict, "skip");
 });
+
+test("credits: unknown spend means the daily cap cannot be kept, so skip", () => {
+  const d = decide(cfg, credits(60), now, null);
+  assert.equal(d.verdict, "skip");
+  assert.match(d.reason, /--spent-usd/);
+});
+
+test("credits that already expired: skip", () => {
+  assert.equal(decide(cfg, credits(-10), now, 0).verdict, "skip");
+});
+
+test("a window that already reset is out of date: unknown", () => {
+  assert.equal(decide(cfg, reading(40, -24), now).verdict, "unknown");
+});
+
+test("billing is decided even without the subscription window", () => {
+  const r = { ...credits(60), windows: [] };
+  assert.equal(decide(cfg, r, now, 0).verdict, "contribute-until-limited");
+});

@@ -23,6 +23,8 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 /** `spentUsd` is what this run has spent so far, used for the daily credits cap. */
 export function decide(cfg: ContributorConfig, reading: UsageReading, now: Date, spentUsd: number | null = null): Decision {
   const b = cfg.budget;
+  // What the request is charged to decides first: without it, the windows are not in play.
+  if (reading.billing) return decideBilling(cfg, reading.billing, now, spentUsd);
   const win = reading.windows.find((w) => w.name === b.window);
   if (!win) {
     return {
@@ -33,8 +35,6 @@ export function decide(cfg: ContributorConfig, reading: UsageReading, now: Date,
     };
   }
   const hoursToReset = round1((win.resetsAt.getTime() - now.getTime()) / 3_600_000);
-  const billing = reading.billing;
-  if (billing) return decideBilling(cfg, billing, now, spentUsd);
   const base = {
     window: win.name, hours_to_reset: hoursToReset, used_pct: win.usedPct, resets_at: win.resetsAt.toISOString(),
   };
@@ -45,6 +45,12 @@ export function decide(cfg: ContributorConfig, reading: UsageReading, now: Date,
     };
   }
 
+  if (hoursToReset <= 0) {
+    return {
+      ...base, verdict: "unknown", surplus_pct: null, donate_pct: null, stop_at_used_pct: null,
+      reason: "The reading says the window already reset, so its usage is out of date.",
+    };
+  }
   if (hoursToReset > b.lead_hours) {
     return {
       ...base, verdict: "skip", surplus_pct: null, donate_pct: null, stop_at_used_pct: null,
@@ -117,11 +123,15 @@ function decideBilling(
         : "Credits are not set to be donated, so anything unused will be lost.")
     : undefined;
 
+  if (hours <= 0) return skip(`${what} They have already expired.`);
   if (!donating) return skip(`${what} Credits are not in donate (${cfg.donate.join(", ") || "nothing"}).`, remind);
   if (days > c.lead_days) {
     return skip(`${what} They expire in ${hours}h, more than credits.lead_days (${c.lead_days} days). The owner may still need them.`, remind);
   }
-  if (spentUsd !== null && spentUsd >= c.daily_usd) {
+  if (spentUsd === null) {
+    return skip(`${what} This run cannot tell what it has spent, so the daily cap (credits.daily_usd) cannot be kept. Pass --spent-usd.`, remind);
+  }
+  if (spentUsd >= c.daily_usd) {
     return { ...skip(`This run spent $${spentUsd}, the daily cap is credits.daily_usd ($${c.daily_usd}).`), spent_usd: spentUsd };
   }
   return {

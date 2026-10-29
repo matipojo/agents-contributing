@@ -34,19 +34,21 @@ export function parseProbeOutput(output: string): { windows: UsageWindow[]; bill
   const windows: UsageWindow[] = [];
   for (const [name, w] of Object.entries(info?.unifiedWindows ?? {})) {
     const resetsAt = toDate(w?.resetsAt);
-    const used = Number(w?.utilization);
-    if (!resetsAt || !Number.isFinite(used)) continue;
+    const used = w?.utilization;
+    if (!resetsAt || typeof used !== "number" || !(used >= 0 && used <= 1)) continue;
     windows.push({ name, usedPct: Math.round(used * 1000) / 10, resetsAt });
   }
   const type = info?.rateLimitType;
   // Window types such as "five_hour" or "seven_day_opus" mean the subscription pays.
   const subscription = !type || /^(five_hour|seven_day)/.test(type);
-  const billing = !info || (subscription && !info.isUsingOverage) ? undefined : {
-    pool: subscription ? "overage" : type!,
-    label: type === "ccr_promotional" ? "Claude cloud session credits" : `Claude "${type}" usage`,
+  const rejected = info?.status === "rejected";
+  const billing = !info || (subscription && !info.isUsingOverage && !rejected) ? undefined : {
+    pool: subscription ? (info.isUsingOverage ? "overage" : type ?? "subscription") : type!,
+    label: !subscription && type === "ccr_promotional" ? "Claude cloud session credits"
+      : subscription && !info.isUsingOverage ? "the Claude subscription" : `Claude "${type ?? "overage"}" usage`,
     checkHint: "Check /usage in the Claude app to see how much is left.",
     expiresAt: toDate(info.resetsAt),
-    allowed: info.status !== "rejected",
+    allowed: !rejected,
     overage: info.isUsingOverage === true,
   };
   return { windows, billing };
@@ -76,7 +78,7 @@ function probe(now: Date): UsageReading {
     }
   }
   const { windows, billing } = parseProbeOutput(output);
-  if (windows.length === 0) {
+  if (windows.length === 0 && !billing) {
     throw new Error("Claude Code reported no usage windows. Usage is only exposed on subscription plans.");
   }
   return { provider: "claude-code", source: `${CLAUDE_BIN} -p`, capturedAt: now, windows, billing };

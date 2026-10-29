@@ -39,8 +39,9 @@ Routine prompt:
 > (leave the flag out if you cannot read it).
 > If the result has `notify`, end the run with exactly that message.
 > If the verdict is `skip` or `unknown`, stop. Otherwise do one agents-contributing task, run the
-> check again, and repeat while the verdict allows it. Stop when usage reaches
-> `stop_at_used_pct` or the session cost reaches `max_spend_usd`.
+> check again, and repeat while the verdict allows it. Keep the `stop_at_used_pct` from the first
+> check of the run (a later check would move it up), and stop when usage reaches it or the
+> session cost reaches `max_spend_usd`.
 
 ## Providers
 

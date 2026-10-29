@@ -62,3 +62,8 @@ test("check-balance probes Codex through its session file", () => {
   assert.equal(out.used_pct, 40);
   assert.equal(out.stop_at_used_pct, 90);
 });
+
+test("parseRollout rejects missing usage instead of reading it as 0", () => {
+  const { windows } = parseRollout(line({ ...LIMITS, primary: { ...LIMITS.primary, used_percent: null } }));
+  assert.deepEqual(windows.map((w) => w.name), ["seven_day"]);
+});

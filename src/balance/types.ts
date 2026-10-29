@@ -38,7 +38,10 @@ export interface Adapter {
 
 /** Accepts epoch seconds, epoch milliseconds or an ISO string. */
 export function toDate(v: unknown): Date | null {
-  if (typeof v === "number" && Number.isFinite(v)) return new Date(v < 1e12 ? v * 1000 : v);
+  if (typeof v === "number" && Number.isFinite(v)) {
+    const d = new Date(v < 1e12 ? v * 1000 : v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
   if (typeof v === "string" && v.trim() !== "") {
     const n = Number(v);
     if (Number.isFinite(n)) return toDate(n);

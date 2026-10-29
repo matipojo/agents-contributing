@@ -40,10 +40,10 @@ export function parseRollout(content: string): { windows: UsageWindow[]; billing
   }
   const windows: UsageWindow[] = [];
   for (const w of [limits?.primary, limits?.secondary]) {
-    const minutes = Number(w?.window_minutes);
-    const used = Number(w?.used_percent);
+    const minutes = w?.window_minutes;
+    const used = w?.used_percent;
     const resetsAt = toDate(w?.resets_at);
-    if (!resetsAt || !Number.isFinite(minutes) || !Number.isFinite(used)) continue;
+    if (!resetsAt || typeof minutes !== "number" || typeof used !== "number" || !(used >= 0 && used <= 100)) continue;
     windows.push({ name: windowName(minutes), usedPct: Math.round(used * 10) / 10, resetsAt });
   }
   // Codex credits are bought. Once a plan limit is reached, requests spend them: paid usage.
@@ -96,7 +96,7 @@ function probe(now: Date): UsageReading {
   const file = findRollout(join(codexHome(), "sessions"), threadId);
   if (!file) throw new Error(`No Codex session file for thread ${threadId}.`);
   const { windows, billing } = parseRollout(readFileSync(file, "utf8"));
-  if (windows.length === 0) {
+  if (windows.length === 0 && !billing) {
     throw new Error("Codex reported no usage windows. Usage is only exposed when signed in with ChatGPT.");
   }
   return { provider: "codex", source: file, capturedAt: now, windows, billing };

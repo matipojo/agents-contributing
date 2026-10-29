@@ -57,6 +57,14 @@ export function loadConfig(path = DEFAULT_CONFIG_PATH): ContributorConfig {
     if (d !== "subscription" && d !== "credits") throw new Error(`donate may only list subscription and credits, got "${d}"`);
   }
   const b = cfg.budget;
+  // YAML accepts .nan, .inf and strings here, which would silently disable the safeguards.
+  const numbers: [string, unknown][] = [
+    ...Object.entries(b).filter(([k]) => k !== "window").map(([k, v]): [string, unknown] => [`budget.${k}`, v]),
+    ...Object.entries(cfg.credits).map(([k, v]): [string, unknown] => [`credits.${k}`, v]),
+  ];
+  for (const [key, v] of numbers) {
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0) throw new Error(`${key} must be a number of 0 or more`);
+  }
   if (b.donate_fraction < 0 || b.donate_fraction > 1) throw new Error("budget.donate_fraction must be between 0 and 1");
   if (b.margin_pct < 0 || b.margin_pct > 100) throw new Error("budget.margin_pct must be between 0 and 100");
   return cfg;

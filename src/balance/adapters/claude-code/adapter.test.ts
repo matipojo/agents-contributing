@@ -58,3 +58,15 @@ test("check-balance probes Claude Code with no config", () => {
   assert.equal(out.used_pct, 40);
   assert.equal(out.stop_at_used_pct, 90);
 });
+
+test("parseProbeOutput rejects missing or out-of-range utilization instead of reading it as 0", () => {
+  const bad = PROBE_OUTPUT.replace('"utilization":0.6', '"utilization":null').replace('"utilization":0.14', '"utilization":3');
+  assert.deepEqual(parseProbeOutput(bad).windows, []);
+});
+
+test("a refused subscription request is reported, so the check skips", () => {
+  const refused = PROBE_OUTPUT.replace('"rateLimitType":"ccr_promotional"', '"rateLimitType":"five_hour"').replace('{"status":"allowed","resetsAt":1793865600', '{"status":"rejected","resetsAt":1793865600');
+  const b = parseProbeOutput(refused).billing;
+  assert.equal(b?.allowed, false);
+  assert.equal(b?.overage, false);
+});

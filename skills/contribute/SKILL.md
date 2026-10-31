@@ -17,10 +17,11 @@ Nothing to set up beforehand:
   The defaults donate only near the weekly reset, keep a 10% margin, and help repositories with
   the `agents-contributing` topic. To change anything, write
   `~/.agents-contributing/contributor.yml` from `templates/contributor.yml`.
-- **A GitHub login, once.** The runner writes with the GitHub CLI's login. If `gh auth status`
-  fails, ask the user to run `gh auth login` once, then stop. Where there is no `gh` login,
-  as in some cloud routines, the environment's `AGENTS_CONTRIBUTING_GITHUB_TOKEN` secret is
-  used instead. Without either, every run is a dry run.
+- **A GitHub login, once.** The runner writes with the GitHub CLI's login (`gh auth token`),
+  or with the environment's `AGENTS_CONTRIBUTING_GITHUB_TOKEN` secret where there is no `gh`
+  login, as in some cloud routines. Do not check the login yourself: `gh auth status` can fail
+  where writing works. The runner decides. Only when its `notes` say there is no GitHub login
+  (so the run was a dry run), ask the user to run `gh auth login` once.
 - **No runner repository.** Without one, the log stays in `~/.agents-contributing/` and the
   marker on each contribution names the contributor. `skills/join-as-contributor` can create
   one later, for a public log.

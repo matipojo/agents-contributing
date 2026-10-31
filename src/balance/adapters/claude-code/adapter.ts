@@ -118,6 +118,7 @@ export const claudeCode: Adapter = {
   vendor: "anthropic",
   // Claude Code sets CLAUDECODE=1 for the commands it runs.
   detect: (env) => env.CLAUDECODE === "1",
+  processNames: ["claude"],
   ci: {
     install: "npm install --global --silent @anthropic-ai/claude-code",
     secret: {

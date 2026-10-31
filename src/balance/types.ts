@@ -64,6 +64,11 @@ export interface Adapter {
   vendor: string;
   /** True when the runner is called from inside this agent, from the environment it sets. */
   detect?(env: NodeJS.ProcessEnv): boolean;
+  /**
+   * The agent's process names. When one agent runs inside another, both environments are
+   * set; the nearest of these in the process tree is the agent actually calling the runner.
+   */
+  processNames?: string[];
   /** The usage windows, and `billing` when requests are charged to something else. */
   read(cfg: ContributorConfig, now: Date): UsageReading;
   /** What the current run has spent so far, if the provider can tell. Caps credit pools. */

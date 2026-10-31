@@ -64,3 +64,11 @@ test("outside the adapter folders, the runner and scripts name no provider", () 
     for (const n of names) assert.ok(!code.includes(`"${n}"`) && !code.includes(`${n})`), `${file} names the "${n}" provider`);
   }
 });
+
+test("one agent inside another: the nearest in the process tree is the one calling the runner", () => {
+  const both = { CLAUDECODE: "1", CODEX_THREAD_ID: "t" };
+  assert.equal(detectAdapter(both, () => ["bash", "codex", "node", "claude"]).name, "codex");
+  assert.equal(detectAdapter(both, () => ["bash", "claude", "codex"]).name, "claude-code");
+  // Codex runs commands under its sandbox process, which is what the tree shows.
+  assert.equal(detectAdapter(both, () => ["node", "tsx", "bash", "-c", "codex-linux-sandbox"]).name, "codex");
+});

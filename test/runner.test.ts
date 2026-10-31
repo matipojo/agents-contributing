@@ -86,7 +86,7 @@ test("git push gets the token from the environment, never from its arguments", a
   const env = new GitHub("secret-token").gitAuthEnv();
   assert.equal(env.GIT_CONFIG_KEY_0, "http.https://github.com/.extraheader");
   assert.equal(Buffer.from(env.GIT_CONFIG_VALUE_0!.split(" ").pop()!, "base64").toString(), "x-access-token:secret-token");
-  assert.throws(() => new GitHub(null).gitAuthEnv(), /needs a token/);
+  assert.throws(() => new GitHub(null).gitAuthEnv(), /needs a GitHub login/);
 });
 
 test("parseNumstat with -z: special characters and renames cannot hide a forbidden path", async () => {
@@ -107,4 +107,23 @@ test("parseNumstat with -z: special characters and renames cannot hide a forbidd
   // A rename out of a forbidden directory still touches it.
   const renamed = parseNumstat("0\t0\t\x00.github/a.yml\x00src/a.yml\x00");
   assert.deepEqual(renamed.map((c) => c.path), [".github/a.yml", "src/a.yml"]);
+});
+
+test("the provider is detected from the agent the runner is called from", async () => {
+  const { detectProvider } = await import("../src/balance/config.ts");
+  assert.equal(detectProvider({ CODEX_THREAD_ID: "t" }), "codex");
+  assert.equal(detectProvider({ CLAUDECODE: "1" }), "claude-code");
+  assert.equal(detectProvider({}), "claude-code");
+});
+
+test("findToken prefers AGENTS_CONTRIBUTING_GITHUB_TOKEN over the gh login", async () => {
+  const { findToken } = await import("../src/runner/github.ts");
+  const before = process.env.AGENTS_CONTRIBUTING_GITHUB_TOKEN;
+  process.env.AGENTS_CONTRIBUTING_GITHUB_TOKEN = "own-token";
+  try {
+    assert.deepEqual(findToken(), { token: "own-token", source: "AGENTS_CONTRIBUTING_GITHUB_TOKEN" });
+  } finally {
+    if (before === undefined) delete process.env.AGENTS_CONTRIBUTING_GITHUB_TOKEN;
+    else process.env.AGENTS_CONTRIBUTING_GITHUB_TOKEN = before;
+  }
 });

@@ -35,7 +35,7 @@ const DEFAULTS: ContributorConfig = {
   version: 1,
   provider: "claude-code",
   targets: { repos: [], topics: ["agents-contributing"] },
-  help_types: ["reproduce", "triage", "tests", "docs"],
+  help_types: ["audit", "pr", "review", "reproduce", "triage", "tests", "docs"],
   budget: { window: "seven_day", lead_hours: 24, margin_pct: 10, donate_fraction: 1, min_surplus_pct: 5 },
   donate: ["subscription", "credits"],
   credits: { lead_days: 3, daily_usd: 15, remind_days: 7 },
@@ -43,12 +43,23 @@ const DEFAULTS: ContributorConfig = {
   log: true,
 };
 
+/**
+ * The agent the runner is called from, when the config does not say: Codex and Claude Code
+ * both mark the commands they run. Outside either, Claude Code.
+ */
+export function detectProvider(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.CODEX_THREAD_ID) return "codex";
+  if (env.CLAUDECODE === "1") return "claude-code";
+  return "claude-code";
+}
+
 /** A missing config at the default path means "use the defaults", so a routine needs no setup. */
 export function loadConfig(path = DEFAULT_CONFIG_PATH): ContributorConfig {
   const missingDefault = path === DEFAULT_CONFIG_PATH && !existsSync(path);
   const raw = (missingDefault ? {} : parseYaml(readFileSync(path, "utf8")) ?? {}) as Partial<ContributorConfig>;
   const cfg: ContributorConfig = {
     ...DEFAULTS,
+    provider: detectProvider(),
     ...raw,
     targets: { ...DEFAULTS.targets, ...raw.targets },
     budget: { ...DEFAULTS.budget, ...raw.budget },

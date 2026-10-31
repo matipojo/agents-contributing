@@ -32,7 +32,7 @@ export interface Context {
   cfg: ContributorConfig;
   gh: GitHub;
   login: string;
-  runnerRepo: string;
+  runnerRepo: string | null;   // null: no runner repository, so the log stays on this machine
   vendor: string;
   dryRun: boolean;
   forced: boolean;
@@ -59,7 +59,7 @@ export interface TaskState {
   branch?: string;
   prompt: string;
   replyFile: string;
-  runnerRepo: string;
+  runnerRepo: string | null;
   login: string;
   vendor: string;
   forced: boolean;
@@ -78,7 +78,7 @@ export async function setup(
   const dryRun = flags.dryRun || !token;
   const notes: string[] = [];
   const gh = new GitHub(token);
-  if (!token) notes.push("No AGENTS_CONTRIBUTING_GITHUB_TOKEN, so this is a dry run: nothing is written to GitHub.");
+  if (!token) notes.push("No GitHub login (run `gh auth login` once), so this is a dry run: nothing is written to GitHub.");
 
   // Only donate what the balance check allows.
   const now = new Date();
@@ -91,21 +91,18 @@ export async function setup(
 
   // Contributing without the runner repository is not allowed: every contribution is logged there.
   const login = token ? await gh.login() : process.env.AGENTS_CONTRIBUTING_GITHUB_LOGIN ?? null;
-  if (!login) throw new Error("Unknown GitHub login. Set AGENTS_CONTRIBUTING_GITHUB_TOKEN (or AGENTS_CONTRIBUTING_GITHUB_LOGIN for a dry run).");
-  const runnerRepo = cfg.runner_repo ?? `${login}/agents-contributing-runner`;
-  let problem = "";
+  if (!login) throw new Error("Unknown GitHub login. Run `gh auth login` once (or set AGENTS_CONTRIBUTING_GITHUB_LOGIN for a dry run).");
+  // The runner repository is optional. With it, the log is public there; without it, the log
+  // stays on this machine and the marker on each contribution still names the contributor.
+  const wanted = cfg.runner_repo ?? `${login}/agents-contributing-runner`;
+  let runnerRepo: string | null = null;
   try {
-    const runner = (await gh.exists(runnerRepo)) ? await gh.repo(runnerRepo) : null;
-    if (!runner) problem = `${runnerRepo} does not exist`;
-    else if (!runner.topics?.includes(RUNNER_TOPIC)) problem = `${runnerRepo} lacks the ${RUNNER_TOPIC} topic`;
-  } catch (e) {
-    if (!dryRun) throw e;
-    problem = `${runnerRepo} could not be read (${(e as Error).message.slice(0, 80)})`;
+    const runner = (await gh.exists(wanted)) ? await gh.repo(wanted) : null;
+    if (runner?.topics?.includes(RUNNER_TOPIC)) runnerRepo = wanted;
+  } catch {
+    // not readable: treat as absent
   }
-  if (problem && !dryRun) {
-    return { stop: { code: 2, result: { result: "unknown", reason: `${problem}. Create it once with skills/join-as-contributor/setup-runner.sh.`, notes } } };
-  }
-  if (problem) notes.push(`${problem}; a real run would stop here.`);
+  if (!runnerRepo) notes.push(`No runner repository, so contributions are logged in ${join(HOME, "contributions.jsonl")}.`);
   return { ctx: { cfg, gh, login, runnerRepo, vendor: VENDORS[cfg.provider] ?? cfg.provider, dryRun, forced: flags.force, notes } };
 }
 
@@ -316,8 +313,9 @@ async function log(gh: GitHub, cfg: ContributorConfig, t: TaskState, url: string
     v: 1, type: t.type, repo: t.repo, url, provider: t.vendor, model, runner: VERSION, at: new Date().toISOString(),
     ...(t.forced ? { forced: true } : {}),
   });
-  if (t.dryRun) {
-    appendFileSync(join(HOME, "dry-run-contributions.jsonl"), line + "\n");
+  if (t.dryRun || !t.runnerRepo) {
+    mkdirSync(HOME, { recursive: true });
+    appendFileSync(join(HOME, t.dryRun ? "dry-run-contributions.jsonl" : "contributions.jsonl"), line + "\n");
     return;
   }
   await gh.appendLine(t.runnerRepo, "contributions.jsonl", line, `Log ${t.type} contribution to ${t.repo}`);
@@ -327,7 +325,8 @@ async function log(gh: GitHub, cfg: ContributorConfig, t: TaskState, url: string
 export async function submit(
   cfg: ContributorConfig, gh: GitHub, t: TaskState, reply: string, model: string, notes: string[],
 ): Promise<Record<string, unknown>> {
-  const marker = contributionMarker({ type: t.type, provider: t.vendor, model, runner: VERSION, from: t.runnerRepo });
+  // `from` names the runner repository, or just the contributor when there is none.
+  const marker = contributionMarker({ type: t.type, provider: t.vendor, model, runner: VERSION, from: t.runnerRepo ?? t.login });
   const out: Record<string, unknown> = { task: t.id, repo: t.repo, type: t.type, model };
 
   if (t.type === "audit") {

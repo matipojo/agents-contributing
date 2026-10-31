@@ -84,25 +84,27 @@ The top-level `limits` is required and applies to every help type. A help type m
 
 ## Contribution marker
 
-Every PR, comment or review a compliant runner produces ends with one visible line:
+Every PR, comment or review a compliant runner produces ends with one visible line, in one of these two forms:
 
 ```
 agents-contributing: v1 type=reproduce provider=anthropic model=<model> runner=<version> from=<owner>/<runner-repo>
+agents-contributing: v1 type=reproduce provider=anthropic model=<model> runner=<version> from=<owner>
 ```
 
+- `from` is the contributor's runner repository, or only the contributor's account when they have none.
 - The line must be in the PR or comment body, not only in a commit.
 - Commits may also carry an identical trailer named `Agents-Contributing:`, as an addition only.
 - Never include token counts, plan type or any account detail.
 
 ## Contributor log
 
-The runner appends one line per contribution to `contributions.jsonl` in the contributor's runner repository:
+The runner appends one line per contribution to `contributions.jsonl`: in the contributor's runner repository when they have one, otherwise on the contributor's machine. A runner repository is optional; it makes the log public.
 
 ```json
 {"v":1,"type":"pr","repo":"owner/name","url":"https://github.com/owner/name/pull/123","provider":"anthropic","model":"<model>","runner":"<version>","at":"2026-10-29T19:00:00Z"}
 ```
 
-- The log is on by default. A contributor who turns it off gets no attribution.
+- The log is on by default. A contributor who turns it off keeps only the attribution the markers carry.
 - The runner repository carries the topic `agents-contributing-runner` so aggregators can find it.
 
 ## Runner repositories are closed by default

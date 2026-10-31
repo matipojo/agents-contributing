@@ -55,11 +55,26 @@ export interface Change {
   deleted: number;
 }
 
+/**
+ * Reads `git diff --numstat -z`. With -z, git never quotes a path (without it, a name with
+ * special characters comes back quoted and would slip past forbidden_paths). A rename is
+ * reported as both its old and new path.
+ */
 export function parseNumstat(out: string): Change[] {
-  return out.split("\n").filter(Boolean).map((l) => {
-    const [a, d, ...p] = l.split("\t");
-    return { path: p.join("\t"), added: Number(a) || 0, deleted: Number(d) || 0 };
-  });
+  const fields = out.split("\0");
+  const changes: Change[] = [];
+  for (let i = 0; i < fields.length; i++) {
+    const m = /^(-|\d+)\t(-|\d+)\t([\s\S]*)$/.exec(fields[i]!.replace(/^\n/, ""));
+    if (!m) continue;
+    const added = Number(m[1]) || 0;
+    const deleted = Number(m[2]) || 0;
+    if (m[3]) changes.push({ path: m[3], added, deleted });
+    else {
+      changes.push({ path: fields[++i] ?? "", added, deleted });
+      changes.push({ path: fields[++i] ?? "", added: 0, deleted: 0 });
+    }
+  }
+  return changes;
 }
 
 const isTest = (path: string) => /(^|\/)(test|tests|__tests__)\/|\.(test|spec)\.[cm]?[jt]sx?$/.test(path);

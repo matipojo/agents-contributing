@@ -41,7 +41,7 @@ test("allowance: the cooldown blocks until it passes", () => {
 });
 
 test("checkChange enforces forbidden paths, size and required tests", () => {
-  const changes = parseNumstat("10\t2\tsrc/a.ts\n3\t0\t.github/workflows/ci.yml\n");
+  const changes = parseNumstat("10\t2\tsrc/a.ts\x003\t0\t.github/workflows/ci.yml\x00");
   const errors = checkChange(changes, { forbidden: [".github/"], maxDiffLines: 10, require: ["tests"] });
   assert.equal(errors.length, 3);
   assert.match(errors.join(" "), /forbidden_paths/);
@@ -50,13 +50,13 @@ test("checkChange enforces forbidden paths, size and required tests", () => {
 });
 
 test("checkChange accepts a small change with a test", () => {
-  const changes = parseNumstat("8\t1\tsrc/spec.ts\n12\t0\ttest/spec.test.ts\n");
+  const changes = parseNumstat("8\t1\tsrc/spec.ts\x0012\t0\ttest/spec.test.ts\x00");
   assert.deepEqual(checkChange(changes, { forbidden: [".github/", "package.json"], maxDiffLines: 300, require: ["tests", "disclosure"] }), []);
 });
 
 test("checkChange: a forbidden file matches exactly, not by prefix of a longer name", () => {
-  assert.deepEqual(checkChange(parseNumstat("1\t0\tpackage.json.bak\n"), { forbidden: ["package.json"] }), []);
-  assert.equal(checkChange(parseNumstat("1\t0\tpackage.json\n"), { forbidden: ["package.json"] }).length, 1);
+  assert.deepEqual(checkChange(parseNumstat("1\t0\tpackage.json.bak\x00"), { forbidden: ["package.json"] }), []);
+  assert.equal(checkChange(parseNumstat("1\t0\tpackage.json\x00"), { forbidden: ["package.json"] }).length, 1);
 });
 
 test("checkChange: no change is not a contribution", () => {
@@ -87,4 +87,24 @@ test("git push gets the token from the environment, never from its arguments", a
   assert.equal(env.GIT_CONFIG_KEY_0, "http.https://github.com/.extraheader");
   assert.equal(Buffer.from(env.GIT_CONFIG_VALUE_0!.split(" ").pop()!, "base64").toString(), "x-access-token:secret-token");
   assert.throws(() => new GitHub(null).gitAuthEnv(), /needs a token/);
+});
+
+test("parseNumstat with -z: special characters and renames cannot hide a forbidden path", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(join(tmpdir(), "ac-git-"));
+  const git = (...a: string[]) => execFileSync("git", a, { cwd: dir, encoding: "utf8" });
+  git("init", "-q");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "base");
+  mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github", "workflows", "é x.yml"), "on: push\n");
+  git("add", "-A");
+  const changes = parseNumstat(git("diff", "--cached", "--numstat", "-z", "HEAD"));
+  assert.deepEqual(changes.map((c) => c.path), [".github/workflows/é x.yml"]);
+  assert.match(checkChange(changes, { forbidden: [".github/"] }).join(" "), /forbidden_paths/);
+  // A rename out of a forbidden directory still touches it.
+  const renamed = parseNumstat("0\t0\t\x00.github/a.yml\x00src/a.yml\x00");
+  assert.deepEqual(renamed.map((c) => c.path), [".github/a.yml", "src/a.yml"]);
 });

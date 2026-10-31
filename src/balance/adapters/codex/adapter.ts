@@ -103,11 +103,24 @@ function probe(now: Date): UsageReading {
   return { provider: "codex", source: file, capturedAt: now, windows, billing };
 }
 
-/** Codex CLI: runs a tiny headless turn and reads the limits from its session file. */
+/**
+ * When the check runs inside Codex (a routine or automation calling the runner), the current
+ * session already saved the limits: read them from its file. Launching a second Codex from
+ * inside the first one's sandbox fails, and would cost a turn.
+ */
+function ownSession(now: Date): UsageReading | null {
+  const threadId = process.env.CODEX_THREAD_ID;
+  const file = threadId ? findRollout(join(codexHome(), "sessions"), threadId) : null;
+  if (!file) return null;
+  const { windows, billing } = parseRollout(readFileSync(file, "utf8"));
+  return windows.length > 0 ? { provider: "codex", source: file, capturedAt: now, windows, billing } : null;
+}
+
+/** Codex CLI: reads the limits from the current Codex session, or from a tiny headless turn. */
 export const codex: Adapter = {
   name: "codex",
   read(_cfg, now) {
-    return probe(now);
+    return ownSession(now) ?? probe(now);
   },
   agent: codexAgent,
 };

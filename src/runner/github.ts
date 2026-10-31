@@ -31,6 +31,7 @@ export interface Issue {
   pull_request?: unknown;
   draft?: boolean;
   created_at: string;
+  updated_at?: string;
   html_url: string;
 }
 

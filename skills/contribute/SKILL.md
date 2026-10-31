@@ -86,11 +86,15 @@ repository's workflow runs it this way, again after each contribution, until it 
 ## What the runner does
 
 1. Runs the balance check, and stops unless it says to contribute.
-2. Checks that the runner repository exists. It never contributes without the log.
+2. Finds the runner repository, if there is one. Without it, the log stays on this machine.
 3. For each repository in `targets` (and by topic, where search works), it skips private and
    runner repositories, reads and validates `AGENTS-CONTRIBUTING.md` from the default branch,
    and checks `providers`.
-4. For each help type the contributor and the repository both allow, in the contributor's
+4. Reacts to the owner's rejections of this contributor's earlier contributions
+   (`agents:rejected-<reason>`, see SPEC): `spam` pauses the repository for 30 days and allows
+   at most one contribution a day anywhere; `wrong` and `out-of-scope` pause that help type
+   there for 7 days; `duplicate` is only reported.
+5. For each help type the contributor and the repository both allow, in the contributor's
    order, it applies the limits, then finds a task in scope:
    - `audit`: the agent reviews the scope path read-only. Each finding becomes an issue,
      unless an open issue has the same title.
@@ -99,8 +103,8 @@ repository's workflow runs it this way, again after each contribution, until it 
      `forbidden_paths`, exceeds `max_diff_lines`, or has no test when tests are required.
    - `review`: the first open pull request with the scope label, by someone else, that this
      contributor has not reviewed. The agent reviews it read-only.
-5. Re-reads `AGENTS-CONTRIBUTING.md` right before submitting, and stops if it changed.
-6. Submits with the contribution marker (pull requests as drafts, from a fork when there is
+6. Re-reads `AGENTS-CONTRIBUTING.md` right before submitting, and stops if it changed.
+7. Submits with the contribution marker (pull requests as drafts, from a fork when there is
    no push access), and appends a line to `contributions.jsonl` in the runner repository.
 
 ## Rules

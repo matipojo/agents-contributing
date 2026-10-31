@@ -218,3 +218,16 @@ test("review: a labeled pull request this contributor opened is reviewed, once",
   gh.reviews = async () => [{ user: { login: "me" }, body: "ok\n\nagents-contributing: v1 type=review provider=x model=m runner=r from=me" }];
   assert.equal((await pick(ctx)).task, undefined, "never twice");
 });
+
+test("a review runs a pull request's code only when its author is trusted", async () => {
+  const { mayRunPullCode } = await import("../src/runner/policy.ts");
+  const { reviewPrompt } = await import("../src/runner/tasks.ts");
+  assert.equal(mayRunPullCode({ user: { login: "me" }, author_association: "NONE" }, "me"), true, "this contributor's own");
+  assert.equal(mayRunPullCode({ user: { login: "maintainer" }, author_association: "MEMBER" }, "me"), true);
+  assert.equal(mayRunPullCode({ user: { login: "stranger" }, author_association: "CONTRIBUTOR" }, "me"), false);
+  assert.equal(mayRunPullCode({ user: { login: "stranger" } }, "me"), false);
+  const base = { number: 1, title: "t", body: "b", diff: "d", notes: "n" };
+  assert.match(reviewPrompt({ ...base, mayRun: true }), /may run the repository's own checks/);
+  assert.match(reviewPrompt({ ...base, mayRun: false }), /Do not run anything from this checkout/);
+  assert.match(reviewPrompt({ ...base, mayRun: false }), /own branch is checked out/);
+});

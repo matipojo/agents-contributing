@@ -17,7 +17,7 @@ import {
 } from "../spec.ts";
 import { GitHub, type Issue, type Repo } from "./github.ts";
 import {
-  allowance, checkChange, markerType, parseNumstat, rejectionPause, rejectionsOf, slowedDown,
+  allowance, checkChange, markerType, mayRunPullCode, parseNumstat, rejectionPause, rejectionsOf, slowedDown,
   type Change, type Contribution, type Rejection,
 } from "./policy.ts";
 import {
@@ -247,12 +247,18 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
 }
 
 /**
- * A fresh checkout of the default branch at a known commit, which submit compares against.
+ * A fresh checkout at a known commit, which submit compares against: the default branch, or
+ * for a review the pull request's own head, so the agent sees the code as it would be merged.
  * Dependencies are installed without install scripts, because an agent's sandbox may have no
  * network and needs them to run the checks.
  */
-function checkout(name: string, dir: string, notes: string[]): void {
+function checkout(name: string, dir: string, notes: string[], pull?: number): void {
   execFileSync("git", ["clone", "--quiet", "--depth", "50", `https://github.com/${name}.git`, dir], { stdio: "ignore" });
+  if (pull !== undefined) {
+    // GitHub keeps every pull request's head, from forks too, at refs/pull/<n>/head.
+    execFileSync("git", ["fetch", "--quiet", "--depth", "50", "origin", `pull/${pull}/head`], { cwd: dir, stdio: "ignore" });
+    execFileSync("git", ["checkout", "--quiet", "--detach", "FETCH_HEAD"], { cwd: dir, stdio: "ignore" });
+  }
   if (existsSync(join(dir, "package-lock.json"))) {
     try {
       execFileSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--silent"], { cwd: dir, stdio: "ignore", timeout: 600_000 });
@@ -275,7 +281,7 @@ export async function prepare(ctx: Context, p: Pick, replyInFile: boolean): Prom
   const base = join(WORK, id);
   const dir = join(base, "repo");
   mkdirSync(base, { recursive: true });
-  checkout(name, dir, ctx.notes);
+  checkout(name, dir, ctx.notes, p.type === "review" ? p.pull!.number : undefined);
   // The agent's reply lives outside the checkout, so it is never part of the change.
   const replyFile = join(base, "reply.json");
   const replyTarget = replyInFile ? replyFile : undefined;
@@ -303,7 +309,12 @@ export async function prepare(ctx: Context, p: Pick, replyInFile: boolean): Prom
     const pull = p.pull!;
     state.pull = { number: pull.number };
     const diff = await ctx.gh.pullDiff(name, pull.number);
-    state.prompt = reviewPrompt({ number: pull.number, title: pull.title, body: pull.body ?? "", diff, notes, replyFile: replyTarget });
+    // Running a pull request's checks runs its author's code, in an environment that holds the
+    // contributor's GitHub login. Only for pull requests this contributor opened, or whose
+    // author has write access to the repository.
+    state.prompt = reviewPrompt({
+      number: pull.number, title: pull.title, body: pull.body ?? "", diff, notes, replyFile: replyTarget, mayRun: mayRunPullCode(pull, ctx.login),
+    });
   }
   writeFileSync(join(base, "task.json"), JSON.stringify(state, null, 2));
   return state;

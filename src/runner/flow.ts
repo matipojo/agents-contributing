@@ -62,6 +62,7 @@ export interface TaskState {
   runnerRepo: string | null;
   login: string;
   vendor: string;
+  provider: string;
   forced: boolean;
   dryRun: boolean;
 }
@@ -255,7 +256,7 @@ export async function prepare(ctx: Context, p: Pick, replyInFile: boolean): Prom
   const state: TaskState = {
     id, type: p.type, repo: name, dir, baseSha: git(dir, "rev-parse", "HEAD").trim(), defaultBranch: repo.default_branch,
     pushAccess: repo.permissions?.push === true, scope, forbidden, maxDiffLines: help.max_diff_lines, require: help.require ?? [],
-    prompt: "", replyFile, runnerRepo: ctx.runnerRepo, login: ctx.login, vendor: ctx.vendor, forced: ctx.forced, dryRun: ctx.dryRun,
+    prompt: "", replyFile, runnerRepo: ctx.runnerRepo, login: ctx.login, vendor: ctx.vendor, provider: ctx.cfg.provider, forced: ctx.forced, dryRun: ctx.dryRun,
   };
   if (p.type === "audit") {
     state.max = Math.min(p.left, 5);
@@ -296,7 +297,7 @@ async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promi
   const h = now.file[`${HELP_PREFIX}${t.type}`];
   if (!h?.enabled) return `help_${t.type} is no longer enabled`;
   if (h.scope !== t.scope) return `help_${t.type} changed its scope to ${h.scope}`;
-  if (!allowedProvider(now.file, t.vendor, t.vendor)) return "the providers list now excludes this agent";
+  if (!allowedProvider(now.file, t.vendor, t.provider)) return "the providers list now excludes this agent";
   const items = await gh.issues(t.repo, `state=all&since=${new Date(Date.now() - 30 * 24 * 3_600_000).toISOString()}`);
   const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, pastContributions(items, t), new Date());
   if (left.left <= 0) return `the limits no longer allow it: ${left.reason}`;

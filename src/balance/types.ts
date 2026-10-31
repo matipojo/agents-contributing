@@ -25,6 +25,24 @@ export interface UsageReading {
   billing?: Billing;        // absent when requests count against the windows
 }
 
+/** One run of the agent, in a checkout of the target repository. */
+export interface AgentTask {
+  cwd: string;
+  prompt: string;
+  write: boolean;           // false: read-only; true: may edit files and run commands in cwd
+}
+
+export interface AgentResult {
+  text: string;             // the agent's final message
+  model: string;            // the model that did the work, for the contribution marker
+}
+
+/** How an adapter runs its agent for the contribution runner. */
+export interface Agent {
+  vendor: string;           // the marker's provider field, e.g. "anthropic" or "openai"
+  run(task: AgentTask): AgentResult;
+}
+
 /**
  * A provider adapter. `read` reports the usage windows, and `billing` when requests are
  * charged to something else, such as credits. `spentUsd`, if the provider can tell, is what
@@ -34,6 +52,7 @@ export interface Adapter {
   name: string;
   read(cfg: ContributorConfig, now: Date): UsageReading;
   spentUsd?(): number | null;
+  agent?: Agent;            // present when the runner can drive this agent
 }
 
 /** Accepts epoch seconds, epoch milliseconds or an ISO string. */

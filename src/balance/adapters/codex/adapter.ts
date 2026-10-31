@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { toDate, type Adapter, type Billing, type UsageReading, type UsageWindow } from "../../types.ts";
+import { codexAgent } from "./agent.ts";
 
 type RateWindow = { used_percent?: unknown; window_minutes?: unknown; resets_at?: unknown };
 type RateLimits = {
@@ -59,11 +60,11 @@ export function parseRollout(content: string): { windows: UsageWindow[]; billing
   return { windows, billing };
 }
 
-const CODEX_BIN = process.env.AGENTS_CONTRIBUTING_CODEX_BIN ?? "codex";
-const codexHome = () => process.env.CODEX_HOME ?? join(homedir(), ".codex");
+export const CODEX_BIN = process.env.AGENTS_CONTRIBUTING_CODEX_BIN ?? "codex";
+export const codexHome = () => process.env.CODEX_HOME ?? join(homedir(), ".codex");
 
 /** Finds the session file of a thread, newest folders first. */
-function findRollout(dir: string, threadId: string): string | null {
+export function findRollout(dir: string, threadId: string): string | null {
   if (!existsSync(dir)) return null;
   for (const name of readdirSync(dir).sort().reverse()) {
     const path = join(dir, name);
@@ -108,4 +109,5 @@ export const codex: Adapter = {
   read(_cfg, now) {
     return probe(now);
   },
+  agent: codexAgent,
 };

@@ -49,6 +49,8 @@ npm test
 | `src/spec.ts` | Spec types, validation and the contribution marker |
 | `src/cli/validate.ts` | Validator for `AGENTS-CONTRIBUTING.md` |
 | `src/cli/check-balance.ts` | Balance check, prints a JSON decision |
+| `src/cli/run.ts` | The contribution runner: one checked contribution per run (`skills/contribute`) |
+| `src/runner/` | The runner's GitHub calls, limits and checks, and the prompts for each help type |
 | `src/balance/` | The decision logic, and `adapters/`: one folder per agent type |
 | `templates/` | Starting points for `AGENTS-CONTRIBUTING.md` and `contributor.yml` |
 | `docs/` | The GitHub Pages site and the design decisions |

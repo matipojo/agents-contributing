@@ -50,7 +50,7 @@ test("check-balance probes Claude Code with no config", () => {
   writeFileSync(fake, `#!/bin/sh\necho '${JSON.stringify(event)}'\n`, { mode: 0o755 });
   const r = spawnSync(process.execPath, ["--import", "tsx", "src/cli/check-balance.ts"], {
     encoding: "utf8",
-    env: { ...process.env, AGENTS_CONTRIBUTING_HOME: home, AGENTS_CONTRIBUTING_CLAUDE_BIN: fake },
+    env: { ...process.env, AGENTS_CONTRIBUTING_HOME: home, AGENTS_CONTRIBUTING_CLAUDE_BIN: fake, CODEX_THREAD_ID: "", CLAUDECODE: "" },
   });
   const out = JSON.parse(r.stdout);
   assert.equal(r.status, 0, r.stdout);

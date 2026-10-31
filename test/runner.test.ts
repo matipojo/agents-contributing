@@ -197,3 +197,24 @@ test("pick skips a repository with a recent spam rejection, and a type rejected 
   assert.equal(dup.task?.type, "audit", "a duplicate does not pause");
   assert.match(ctx.notes.join(" "), /rejected as duplicates/);
 });
+
+test("review: a labeled pull request this contributor opened is reviewed, once", async () => {
+  const { pick } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { loadConfig } = await import("../src/balance/config.ts");
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  gh.file = async () => "---\nversion: 1\nhelp_review:\n  enabled: true\n  scope: label:agents:review-wanted\n  output: review\n" +
+    "limits:\n  max_open_agent_contributions: 9\n  max_per_contributor_per_week: 9\n  cooldown_hours: 0\n---\n";
+  const pr = (number: number, labels: string[]) => ({
+    number, title: `#${number}`, body: "fix", state: "open", user: { login: "me" }, labels: labels.map((name) => ({ name })),
+    pull_request: {}, created_at: new Date().toISOString(), html_url: "",
+  });
+  gh.issues = async () => [pr(1, []), pr(2, ["agents:review-wanted"])];
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["review"] };
+  const ctx = { cfg, gh, login: "me", runnerRepo: null, vendor: "test", dryRun: true, forced: false, notes: [] as string[] };
+  gh.reviews = async () => [];
+  assert.equal((await pick(ctx)).task?.pull?.number, 2, "the owner's label asks for it, whoever opened it");
+  gh.reviews = async () => [{ user: { login: "me" }, body: "ok\n\nagents-contributing: v1 type=review provider=x model=m runner=r from=me" }];
+  assert.equal((await pick(ctx)).task, undefined, "never twice");
+});

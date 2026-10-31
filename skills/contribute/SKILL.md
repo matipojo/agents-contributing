@@ -101,8 +101,9 @@ repository's workflow runs it this way, again after each contribution, until it 
    - `pr`: the first open issue with the scope label that no agent pull request claims. The
      agent fixes it in the checkout. The runner rejects the change if it touches
      `forbidden_paths`, exceeds `max_diff_lines`, or has no test when tests are required.
-   - `review`: the first open pull request with the scope label, by someone else, that this
-     contributor has not reviewed. The agent reviews it read-only.
+   - `review`: the first open pull request with the scope label that this contributor has not
+     reviewed yet, including one it opened itself: the owner's label is the request. The agent
+     reviews it read-only.
 6. Re-reads `AGENTS-CONTRIBUTING.md` right before submitting, and stops if it changed.
 7. Submits with the contribution marker (pull requests as drafts, from a fork when there is
    no push access), and appends a line to `contributions.jsonl` in the runner repository.

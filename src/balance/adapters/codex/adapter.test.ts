@@ -53,7 +53,7 @@ test("check-balance probes Codex through its session file", () => {
   writeFileSync(join(home, "contributor.yml"), "provider: codex\n");
   const r = spawnSync(process.execPath, ["--import", "tsx", "src/cli/check-balance.ts"], {
     encoding: "utf8",
-    env: { ...process.env, AGENTS_CONTRIBUTING_HOME: home, AGENTS_CONTRIBUTING_CODEX_BIN: fake, CODEX_HOME: codexHome },
+    env: { ...process.env, AGENTS_CONTRIBUTING_HOME: home, AGENTS_CONTRIBUTING_CODEX_BIN: fake, CODEX_HOME: codexHome, CODEX_THREAD_ID: "" },
   });
   const out = JSON.parse(r.stdout);
   assert.equal(r.status, 0, r.stdout);

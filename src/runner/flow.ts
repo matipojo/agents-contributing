@@ -232,7 +232,10 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
         const issue = kind === "label" ? openIssues.find((i) => i.labels.some((l) => l.name === value) && !claimed.has(i.number)) : undefined;
         if (issue) return { task: { target, type, left: left.left, issue }, skipped };
       } else {
-        for (const p of kind === "label" ? openPulls.filter((p) => p.labels.some((l) => l.name === value) && p.user?.login !== login) : []) {
+        // The owner's label is the request, so a pull request this contributor opened is
+        // reviewed too: an agent's own fix gets a second, separate pass. GitHub allows a
+        // comment review on one's own pull request, which is the only kind the runner posts.
+        for (const p of kind === "label" ? openPulls.filter((p) => p.labels.some((l) => l.name === value)) : []) {
           const reviews = await gh.reviews(name, p.number);
           if (!reviews.some((r) => r.user?.login === login && markerType(r.body))) return { task: { target, type, left: left.left, pull: p }, skipped };
         }

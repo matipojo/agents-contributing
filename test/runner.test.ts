@@ -127,3 +127,20 @@ test("findToken prefers AGENTS_CONTRIBUTING_GITHUB_TOKEN over the gh login", asy
     else process.env.AGENTS_CONTRIBUTING_GITHUB_TOKEN = before;
   }
 });
+
+test("a scope label with a colon in its name, such as agents:fix-wanted, picks the right issue", async () => {
+  const { pick } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { loadConfig } = await import("../src/balance/config.ts");
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  gh.file = async () => "---\nversion: 1\nhelp_pr:\n  enabled: true\n  scope: label:agents:fix-wanted\n  output: pr\n" +
+    "limits:\n  max_open_agent_contributions: 3\n  max_per_contributor_per_week: 1\n  cooldown_hours: 0\n---\n";
+  const issue = (number: number, label: string) => ({
+    number, title: `#${number}`, body: "", state: "open", user: { login: "someone" }, labels: [{ name: label }], created_at: new Date().toISOString(), html_url: "",
+  });
+  gh.issues = async () => [issue(1, "agents"), issue(2, "fix-wanted"), issue(3, "agents:fix-wanted")];
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["pr"] };
+  const ctx = { cfg, gh, login: "me", runnerRepo: null, vendor: "test", dryRun: true, forced: false, notes: [] };
+  assert.equal((await pick(ctx)).task?.issue?.number, 3);
+});

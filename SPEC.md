@@ -35,7 +35,7 @@ Each help type is its own top-level field named `help_` followed by the type nam
 | Field | Meaning |
 |---|---|
 | `enabled` | Whether this help type is active. Default: `false`. |
-| `scope` | What it applies to, for example `label:needs-repro` or `path:docs/`. Without a scope it applies to nothing. |
+| `scope` | What it applies to, for example `label:agents:repro-wanted` or `path:docs/`. Without a scope it applies to nothing. |
 | `output` | What the agent produces: `comment`, `pr`, `review`, `failing-test-pr`, or `issue`. |
 | `require` | Requirements, for example `tests`, `disclosure`, `changelog`. |
 | `forbidden_paths` | Files and directories this help type must not touch, in addition to the top-level `forbidden_paths`. |
@@ -128,9 +128,27 @@ In general, every repository is closed by default: no file means no contribution
 | `review` | The owner marked the review as helpful |
 | `audit` | The owner labeled the issue for work, or a fix for it was merged |
 
+## Labels
+
+A repository may use any label in a `scope`. These names are recommended, so owners and
+contributors read them the same way everywhere. Each starts with `agents:`, and a request
+label ends in `-wanted`: it is an open request, not a record that the work was done. Only the
+owner sets labels; a runner never does.
+
+| Label | Set on | Meaning |
+|---|---|---|
+| `agents:fix-wanted` | issue | An agent may fix this (`help_pr`) |
+| `agents:review-wanted` | pull request | An agent may review this (`help_review`) |
+| `agents:repro-wanted` | issue | An agent may reproduce this bug (`help_reproduce`) |
+| `agents:triage-wanted` | issue | An agent may suggest labels (`help_triage`) |
+| `agents:unwanted` | issue, pull request | This agent contribution was not wanted (see below) |
+
+Whether the work was done shows on the item itself: a pull request that says `Closes #N`, or
+a review or comment with the contribution marker.
+
 ## Feedback from the repository owner
 
-- The label `agent-spam` on a PR or issue, or a 👎 reaction from the owner on a comment, marks a contribution as unwanted.
+- The label `agents:unwanted` on a PR or issue, or a 👎 reaction from the owner on a comment, marks a contribution as unwanted.
 - A compliant runner checks its recent contributions to each repository. If any were marked as spam, it stops contributing to that repository for a period and slows down overall.
 
 ## Example
@@ -140,15 +158,15 @@ In general, every repository is closed by default: no file means no contribution
 version: 1
 help_triage:
   enabled: true
-  scope: label:new
+  scope: label:agents:triage-wanted
   output: comment
 help_reproduce:
   enabled: true
-  scope: label:needs-repro
+  scope: label:agents:repro-wanted
   output: failing-test-pr
 help_pr:
   enabled: true
-  scope: label:agents-welcome
+  scope: label:agents:fix-wanted
   output: pr
   require: [tests, disclosure]
   forbidden_paths: [package.json, package-lock.json]

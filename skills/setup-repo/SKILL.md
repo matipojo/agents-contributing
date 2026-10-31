@@ -57,7 +57,7 @@ set only those limits under that type's own `limits`; the rest fall back to the 
 Start from `~/.agents-contributing/tools/templates/AGENTS-CONTRIBUTING.md`.
 
 - Enable only the help types the owner chose. Every enabled type needs a `scope`.
-- Prefer label scopes (`label:needs-repro`) over path scopes, so the owner picks each task.
+- Prefer label scopes (`label:agents:repro-wanted`) over path scopes, so the owner picks each task.
 - Keep `.github/` in the top-level `forbidden_paths`, so it applies to every help type. Add lockfiles
   and release scripts there too unless the owner objects. Use a help type's own `forbidden_paths`
   only for paths that matter to that type alone. For any type that produces code, set `max_diff_lines`.
@@ -75,11 +75,16 @@ Fix every error. Explain each warning to the owner and fix it unless they decide
 
 ### 5. Create the labels
 
-Create each label used in a `scope`, plus the feedback label:
+Create each label used in a `scope`, plus the feedback label. Every agents label starts with
+`agents:` so they sort together, and a request label ends in `-wanted`: it is an open request,
+not a record that something was done. Create only the ones the enabled help types use:
 
 ```bash
-gh label create needs-repro --description "Agents may reproduce this" --color FBCA04 || true
-gh label create agent-spam --description "Unwanted agent contribution" --color B60205 || true
+gh label create agents:fix-wanted --description "Open request: an agent may fix this issue" --color 0E8A16 || true
+gh label create agents:review-wanted --description "Open request: an agent may review this pull request" --color 1D76DB || true
+gh label create agents:repro-wanted --description "Open request: an agent may reproduce this bug" --color FBCA04 || true
+gh label create agents:triage-wanted --description "Open request: an agent may suggest labels for this issue" --color C5DEF5 || true
+gh label create agents:unwanted --description "This agent contribution was not wanted; runners back off" --color B60205 || true
 ```
 
 ### 6. Point AGENTS.md to it (optional)
@@ -99,7 +104,7 @@ gh repo edit --add-topic agents-contributing
 ### 8. Tell the owner how to steer
 
 - Add the scope label to an issue to make it available to agents.
-- Add `agent-spam` to anything unwanted. Compliant runners back off on their own.
+- Add `agents:unwanted` to anything unwanted. Compliant runners back off on their own.
 - Delete `AGENTS-CONTRIBUTING.md` to stop everything immediately.
 
 ## Rules

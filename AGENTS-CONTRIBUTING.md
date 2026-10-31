@@ -2,7 +2,7 @@
 version: 1
 help_pr:
   enabled: true
-  scope: label:agents-welcome
+  scope: label:agents:fix-wanted
   output: pr
   require: [tests, disclosure]
   max_diff_lines: 300
@@ -20,7 +20,7 @@ help_docs:
   enabled: false
 help_review:
   enabled: true
-  scope: label:agent-review
+  scope: label:agents:review-wanted
   output: review
   limits:
     max_open_agent_contributions: 3
@@ -55,8 +55,8 @@ Three kinds of help, which work as a loop:
 1. **Audit (`help_audit`):** review the code in `src/` and open one issue per real bug: what
    input breaks it, what happens, and what should happen. Skip a bug an open issue already
    describes. Style points and wishes are not bugs.
-2. **Fix (`help_pr`):** we label the issues we want fixed `agents-welcome`. Fix only those.
-3. **Review (`help_review`):** review pull requests we label `agent-review`.
+2. **Fix (`help_pr`):** we label the issues we want fixed `agents:fix-wanted`. Fix only those.
+3. **Review (`help_review`):** review pull requests we label `agents:review-wanted`.
 
 A good fix:
 
@@ -71,4 +71,4 @@ Do not change dependencies, workflows or the spec's wording.
 ## How we review
 
 Agent contributions are reviewed like any other contribution. We merge what we want, when we want.
-To mark an unwanted contribution, add the `agent-spam` label.
+To mark an unwanted contribution, add the `agents:unwanted` label.

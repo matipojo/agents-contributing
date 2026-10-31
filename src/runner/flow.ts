@@ -16,7 +16,7 @@ import {
   contributionMarker, effectiveForbiddenPaths, effectiveLimits, HELP_PREFIX, validateText, type AgentsContributing,
 } from "../spec.ts";
 import { GitHub, type Issue, type Repo } from "./github.ts";
-import { allowance, checkChange, markerType, parseNumstat, type Contribution } from "./policy.ts";
+import { allowance, checkChange, markerType, parseNumstat, type Change, type Contribution } from "./policy.ts";
 import {
   auditPrompt, fixPrompt, parseFindings, parseFix, parseReview, reviewPrompt, SUPPORTED_TYPES, type SupportedType,
 } from "./tasks.ts";
@@ -109,6 +109,25 @@ export async function setup(
   return { ctx: { cfg, gh, login, runnerRepo, vendor: VENDORS[cfg.provider] ?? cfg.provider, dryRun, forced: flags.force, notes } };
 }
 
+/**
+ * Earlier agent contributions in a repository, from their markers. A dry run also counts the
+ * contributions earlier dry runs logged locally, so its limits fill up like a real run's.
+ */
+function pastContributions(items: Issue[], t: { repo: string; login: string; dryRun: boolean }): Contribution[] {
+  const past: Contribution[] = items.flatMap((i) => {
+    const type = markerType(i.body);
+    return type ? [{ type, author: i.user?.login ?? "", open: i.state === "open", at: new Date(i.created_at) }] : [];
+  });
+  const dryLog = join(HOME, "dry-run-contributions.jsonl");
+  if (t.dryRun && existsSync(dryLog)) {
+    for (const line of readFileSync(dryLog, "utf8").split("\n").filter(Boolean)) {
+      const e = JSON.parse(line) as { type: string; repo: string; at: string };
+      if (e.repo === t.repo) past.push({ type: e.type, author: t.login, open: true, at: new Date(e.at) });
+    }
+  }
+  return past;
+}
+
 interface Target {
   repo: Repo;
   file: AgentsContributing;
@@ -167,10 +186,7 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
 
     const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
     const items = await gh.issues(name, `state=all&since=${since}`);
-    const past: Contribution[] = items.flatMap((i) => {
-      const type = markerType(i.body);
-      return type ? [{ type, author: i.user?.login ?? "", open: i.state === "open", at: new Date(i.created_at) }] : [];
-    });
+    const past = pastContributions(items, { repo: name, login, dryRun: ctx.dryRun });
     const target: Target = { repo, file: read.file, notes: read.notes, items, past };
     const openIssues = items.filter((i) => i.state === "open" && !i.pull_request);
     const openPulls = items.filter((i) => i.state === "open" && i.pull_request);
@@ -273,13 +289,24 @@ export function loadTask(id: string): TaskState {
   return JSON.parse(readFileSync(path, "utf8")) as TaskState;
 }
 
-/** Re-reads the file right before submitting: the owner may have changed or removed it. */
-async function stillAllowed(gh: GitHub, t: TaskState): Promise<string | null> {
+/**
+ * Re-reads the file right before submitting: the owner may have removed it, or tightened it
+ * since the task was picked. Scope, providers, limits and, for a change, its rules all count.
+ */
+async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promise<string | null> {
   const now = await readFile(gh, t.repo);
   if (typeof now === "string") return now;
   const h = now.file[`${HELP_PREFIX}${t.type}`];
   if (!h?.enabled) return `help_${t.type} is no longer enabled`;
   if (h.scope !== t.scope) return `help_${t.type} changed its scope to ${h.scope}`;
+  if (!allowedProvider(now.file, t.vendor, t.vendor)) return "the providers list now excludes this agent";
+  const items = await gh.issues(t.repo, `state=all&since=${new Date(Date.now() - 30 * 24 * 3_600_000).toISOString()}`);
+  const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, pastContributions(items, t), new Date());
+  if (left.left <= 0) return `the limits no longer allow it: ${left.reason}`;
+  if (changes) {
+    const errors = checkChange(changes, { forbidden: effectiveForbiddenPaths(now.file, t.type), maxDiffLines: h.max_diff_lines, require: h.require });
+    if (errors.length) return `the change no longer fits the file: ${errors.join(" ")}`;
+  }
   return null;
 }
 
@@ -326,10 +353,10 @@ export async function submit(
     if ("skip" in fix) return { ...out, issue: t.issue!.number, skipped: fix.skip };
     git(t.dir, "add", "-A");
     // Compare with the commit prepare checked out, so commits the agent made are counted too.
-    const changes = parseNumstat(git(t.dir, "diff", "--cached", "--numstat", t.baseSha));
+    const changes = parseNumstat(git(t.dir, "diff", "--cached", "--numstat", "-z", t.baseSha));
     const errors = checkChange(changes, { forbidden: t.forbidden, maxDiffLines: t.maxDiffLines, require: t.require });
     if (errors.length) return { ...out, issue: t.issue!.number, rejected: errors };
-    const why = await stillAllowed(gh, t);
+    const why = await stillAllowed(gh, t, changes);
     if (why) return { ...out, aborted: why };
     const body = [
       fix.summary, `Closes #${t.issue!.number}`,

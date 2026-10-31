@@ -115,6 +115,18 @@ function sessionSpendUsd(sessionId = process.env.CLAUDE_CODE_SESSION_ID): number
 /** Claude Code: runs a tiny headless request and reads the limits Claude Code reports for it. */
 export const claudeCode: Adapter = {
   name: "claude-code",
+  vendor: "anthropic",
+  // Claude Code sets CLAUDECODE=1 for the commands it runs.
+  detect: (env) => env.CLAUDECODE === "1",
+  processNames: ["claude"],
+  ci: {
+    install: "npm install --global --silent @anthropic-ai/claude-code",
+    secret: {
+      name: "CLAUDE_CODE_OAUTH_TOKEN",
+      command: "claude setup-token",
+      help: "Claude Code opens your browser to create a long-lived token for your subscription. Copy the token it prints.",
+    },
+  },
   read(_cfg, now) {
     return probe(now);
   },

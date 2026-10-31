@@ -16,7 +16,10 @@ import {
   contributionMarker, effectiveForbiddenPaths, effectiveLimits, HELP_PREFIX, validateText, type AgentsContributing,
 } from "../spec.ts";
 import { GitHub, type Issue, type Repo } from "./github.ts";
-import { allowance, checkChange, markerType, parseNumstat, type Change, type Contribution } from "./policy.ts";
+import {
+  allowance, checkChange, markerType, parseNumstat, rejectionPause, rejectionsOf, slowedDown,
+  type Change, type Contribution, type Rejection,
+} from "./policy.ts";
 import {
   auditPrompt, fixPrompt, parseFindings, parseFix, parseReview, reviewPrompt, SUPPORTED_TYPES, type SupportedType,
 } from "./tasks.ts";
@@ -24,9 +27,6 @@ import {
 const RUNNER_TOPIC = "agents-contributing-runner";
 export const VERSION = `agents-contributing/${JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version}`;
 export const WORK = join(HOME, "work");
-
-/** The marker's provider field for each adapter; `declared` names no vendor. */
-const VENDORS: Record<string, string> = { "claude-code": "anthropic", codex: "openai" };
 
 export interface Context {
   cfg: ContributorConfig;
@@ -104,7 +104,7 @@ export async function setup(
     // not readable: treat as absent
   }
   if (!runnerRepo) notes.push(`No runner repository, so contributions are logged in ${join(HOME, "contributions.jsonl")}.`);
-  return { ctx: { cfg, gh, login, runnerRepo, vendor: VENDORS[cfg.provider] ?? cfg.provider, dryRun, forced: flags.force, notes } };
+  return { ctx: { cfg, gh, login, runnerRepo, vendor: adapter.vendor, dryRun, forced: flags.force, notes } };
 }
 
 /**
@@ -159,6 +159,14 @@ export interface Pick {
   pull?: Issue;
 }
 
+/** True when this contributor's local log already has a contribution today (UTC). */
+function contributedToday(ctx: Context, now: Date): boolean {
+  const day = now.toISOString().slice(0, 10);
+  const path = join(HOME, ctx.dryRun ? "dry-run-contributions.jsonl" : "contributions.jsonl");
+  if (!existsSync(path)) return false;
+  return readFileSync(path, "utf8").split("\n").some((l) => l.includes(`"at":"${day}`));
+}
+
 /** Chooses the first task that every rule allows, or reports why there is none. */
 export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record<string, string> }> {
   const { cfg, gh, login, runnerRepo, notes } = ctx;
@@ -173,6 +181,9 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
   }
   const skipped: Record<string, string> = {};
   const now = new Date();
+  // First every target and its rejections: a spam rejection anywhere slows the contributor
+  // down everywhere.
+  const targets: { target: Target; rejections: Rejection[] }[] = [];
   for (const name of names) {
     if (name === runnerRepo) continue;
     const repo = await gh.repo(name);
@@ -181,11 +192,24 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
     const read = await readFile(gh, name);
     if (typeof read === "string") { skipped[name] = read; continue; }
     if (!allowedProvider(read.file, ctx.vendor, cfg.provider)) { skipped[name] = "the providers list excludes this agent"; continue; }
-
     const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
     const items = await gh.issues(name, `state=all&since=${since}`);
     const past = pastContributions(items, { repo: name, login, dryRun: ctx.dryRun });
-    const target: Target = { repo, file: read.file, notes: read.notes, items, past };
+    targets.push({ target: { repo, file: read.file, notes: read.notes, items, past }, rejections: rejectionsOf(items, login) });
+  }
+  const all = targets.flatMap((t) => t.rejections);
+  const duplicates = all.filter((r) => r.reason === "duplicate").length;
+  if (duplicates) notes.push(`${duplicates} recent contribution(s) were rejected as duplicates.`);
+  const today = now.toISOString().slice(0, 10);
+  const madeToday = targets.some((t) => t.target.past.some((c) => c.author === login && c.at.toISOString().startsWith(today)));
+  if (slowedDown(all, now) && (madeToday || contributedToday(ctx, now))) {
+    return { skipped: { ...skipped, all: "a contribution was rejected as spam in the last 30 days: at most one contribution a day until then" } };
+  }
+
+  for (const { target, rejections } of targets) {
+    const name = target.repo.full_name;
+    const { items, past } = target;
+    const read = { file: target.file };
     const openIssues = items.filter((i) => i.state === "open" && !i.pull_request);
     const openPulls = items.filter((i) => i.state === "open" && i.pull_request);
 
@@ -195,6 +219,8 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
 
     for (const type of types) {
       const help = read.file[`${HELP_PREFIX}${type}`]!;
+      const paused = rejectionPause(rejections, type, now);
+      if (paused) { skipped[`${name} ${type}`] = paused; continue; }
       const left = allowance(effectiveLimits(read.file, type), help.limits ?? {}, type, login, past, now);
       if (left.left <= 0) { skipped[`${name} ${type}`] = left.reason; continue; }
       const [kind, value] = [help.scope?.split(":")[0], help.scope?.slice(help.scope.indexOf(":") + 1)];
@@ -207,7 +233,10 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
         const issue = kind === "label" ? openIssues.find((i) => i.labels.some((l) => l.name === value) && !claimed.has(i.number)) : undefined;
         if (issue) return { task: { target, type, left: left.left, issue }, skipped };
       } else {
-        for (const p of kind === "label" ? openPulls.filter((p) => p.labels.some((l) => l.name === value) && p.user?.login !== login) : []) {
+        // The owner's label is the request, so a pull request this contributor opened is
+        // reviewed too: an agent's own fix gets a second, separate pass. GitHub allows a
+        // comment review on one's own pull request, which is the only kind the runner posts.
+        for (const p of kind === "label" ? openPulls.filter((p) => p.labels.some((l) => l.name === value)) : []) {
           const reviews = await gh.reviews(name, p.number);
           if (!reviews.some((r) => r.user?.login === login && markerType(r.body))) return { task: { target, type, left: left.left, pull: p }, skipped };
         }

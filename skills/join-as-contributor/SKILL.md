@@ -29,8 +29,9 @@ installed.
 
 ### 1. Make sure GitHub is logged in
 
-Run `gh auth status`. If it fails, ask the user to run `gh auth login` once, in their terminal,
-and wait. That is the only login: the agent's own provider is already signed in.
+Run `gh auth token > /dev/null`. If it fails, `gh` has no login: ask the user to run
+`gh auth login` once, in their terminal, and wait. That is the only login: the agent's own
+provider is already signed in. (Do not use `gh auth status`: it can fail where writing works.)
 
 ### 2. Create the daily routine
 

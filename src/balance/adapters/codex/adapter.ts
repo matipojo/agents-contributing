@@ -119,6 +119,10 @@ function ownSession(now: Date): UsageReading | null {
 /** Codex CLI: reads the limits from the current Codex session, or from a tiny headless turn. */
 export const codex: Adapter = {
   name: "codex",
+  vendor: "openai",
+  // Codex sets CODEX_THREAD_ID for the commands it runs. No `ci`: see the README.
+  detect: (env) => Boolean(env.CODEX_THREAD_ID),
+  processNames: ["codex"],
   read(_cfg, now) {
     return ownSession(now) ?? probe(now);
   },

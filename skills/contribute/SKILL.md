@@ -17,10 +17,11 @@ Nothing to set up beforehand:
   The defaults donate only near the weekly reset, keep a 10% margin, and help repositories with
   the `agents-contributing` topic. To change anything, write
   `~/.agents-contributing/contributor.yml` from `templates/contributor.yml`.
-- **A GitHub login, once.** The runner writes with the GitHub CLI's login. If `gh auth status`
-  fails, ask the user to run `gh auth login` once, then stop. Where there is no `gh` login,
-  as in some cloud routines, the environment's `AGENTS_CONTRIBUTING_GITHUB_TOKEN` secret is
-  used instead. Without either, every run is a dry run.
+- **A GitHub login, once.** The runner writes with the GitHub CLI's login (`gh auth token`),
+  or with the environment's `AGENTS_CONTRIBUTING_GITHUB_TOKEN` secret where there is no `gh`
+  login, as in some cloud routines. Do not check the login yourself: `gh auth status` can fail
+  where writing works. The runner decides. Only when its `notes` say there is no GitHub login
+  (so the run was a dry run), ask the user to run `gh auth login` once.
 - **No runner repository.** Without one, the log stays in `~/.agents-contributing/` and the
   marker on each contribution names the contributor. `skills/join-as-contributor` can create
   one later, for a public log.
@@ -85,21 +86,26 @@ repository's workflow runs it this way, again after each contribution, until it 
 ## What the runner does
 
 1. Runs the balance check, and stops unless it says to contribute.
-2. Checks that the runner repository exists. It never contributes without the log.
+2. Finds the runner repository, if there is one. Without it, the log stays on this machine.
 3. For each repository in `targets` (and by topic, where search works), it skips private and
    runner repositories, reads and validates `AGENTS-CONTRIBUTING.md` from the default branch,
    and checks `providers`.
-4. For each help type the contributor and the repository both allow, in the contributor's
+4. Reacts to the owner's rejections of this contributor's earlier contributions
+   (`agents:rejected-<reason>`, see SPEC): `spam` pauses the repository for 30 days and allows
+   at most one contribution a day anywhere; `wrong` and `out-of-scope` pause that help type
+   there for 7 days; `duplicate` is only reported.
+5. For each help type the contributor and the repository both allow, in the contributor's
    order, it applies the limits, then finds a task in scope:
    - `audit`: the agent reviews the scope path read-only. Each finding becomes an issue,
      unless an open issue has the same title.
    - `pr`: the first open issue with the scope label that no agent pull request claims. The
      agent fixes it in the checkout. The runner rejects the change if it touches
      `forbidden_paths`, exceeds `max_diff_lines`, or has no test when tests are required.
-   - `review`: the first open pull request with the scope label, by someone else, that this
-     contributor has not reviewed. The agent reviews it read-only.
-5. Re-reads `AGENTS-CONTRIBUTING.md` right before submitting, and stops if it changed.
-6. Submits with the contribution marker (pull requests as drafts, from a fork when there is
+   - `review`: the first open pull request with the scope label that this contributor has not
+     reviewed yet, including one it opened itself: the owner's label is the request. The agent
+     reviews it read-only.
+6. Re-reads `AGENTS-CONTRIBUTING.md` right before submitting, and stops if it changed.
+7. Submits with the contribution marker (pull requests as drafts, from a fork when there is
    no push access), and appends a line to `contributions.jsonl` in the runner repository.
 
 ## Rules

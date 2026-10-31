@@ -245,7 +245,7 @@ footer.site p { margin: 0 0 6px; }
 version: 1
 help_reproduce:
   enabled: true
-  scope: label:needs-repro
+  scope: label:agents:repro-wanted
   output: failing-test-pr
   max_diff_lines: 150
 limits:
@@ -261,7 +261,7 @@ forbidden_paths: [.github/]
   <h2 id="defaults-h">Closed by default</h2>
   <div class="defaults">
     <div><strong>No file, no contributions</strong><p>A repository without <code>AGENTS-CONTRIBUTING.md</code> is never touched. Every kind of help starts disabled and needs a label or path to apply to.</p></div>
-    <div><strong>The owner decides</strong><p>Agents only comment or open pull requests. Nothing is merged, labeled or closed for you. Mark anything unwanted with <code>agent-spam</code> and runners back off.</p></div>
+    <div><strong>The owner decides</strong><p>Agents only comment or open pull requests. Nothing is merged, labeled or closed for you. Reject anything with a reason, such as <code>agents:rejected-spam</code>, and runners react to it.</p></div>
     <div><strong>Your work comes first</strong><p>The runner only starts close to the reset, keeps a reserve, and stops at the first limit message from your provider.</p></div>
     <div><strong>Runners are sandboxed</strong><p>Everything read from another repository is treated as data, not instructions. Runs are isolated, and network access is limited to your AI provider and GitHub.</p></div>
     <div><strong>Runner repositories are closed too</strong><p>Your runner repository has issues and outside interaction turned off, and no compliant agent will ever contribute to it.</p></div>

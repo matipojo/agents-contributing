@@ -118,3 +118,58 @@ export function extractJson(text: string): unknown {
   }
   throw new Error("The agent's reply has no JSON.");
 }
+
+/**
+ * How long a rejection pauses the contributor, by its reason (SPEC, "Feedback from the
+ * repository owner"). `repo` pauses every help type in that repository, `type` only the
+ * rejected one; `duplicate` is only counted.
+ */
+export const REJECTIONS = {
+  spam: { days: 30, scope: "repo" },
+  wrong: { days: 7, scope: "type" },
+  "out-of-scope": { days: 7, scope: "type" },
+  duplicate: { days: 0, scope: "type" },
+} as const;
+export type RejectionReason = keyof typeof REJECTIONS;
+const REJECTED_PREFIX = "agents:rejected-";
+
+export interface Rejection {
+  type: string;           // the help type of the rejected contribution, from its marker
+  reason: RejectionReason;
+  at: Date;               // when it was last updated, which is when the label was added at the latest
+  url: string;
+}
+
+/** This contributor's contributions the owner rejected, with the reason from the label. */
+export function rejectionsOf(
+  items: { body: string | null; user: { login: string } | null; labels: { name: string }[]; created_at: string; updated_at?: string; html_url: string }[],
+  me: string,
+): Rejection[] {
+  return items.flatMap((i) => {
+    const type = markerType(i.body);
+    if (!type || i.user?.login !== me) return [];
+    return i.labels
+      .map((l) => l.name.startsWith(REJECTED_PREFIX) ? l.name.slice(REJECTED_PREFIX.length) : "")
+      .filter((r): r is RejectionReason => r in REJECTIONS)
+      .map((reason) => ({ type, reason, at: new Date(i.updated_at ?? i.created_at), url: i.html_url }));
+  });
+}
+
+/** Why a rejection still pauses this help type in this repository, or null. */
+export function rejectionPause(rejections: Rejection[], type: string, now: Date): string | null {
+  for (const r of rejections) {
+    const rule = REJECTIONS[r.reason];
+    if (rule.days === 0) continue; // only counted; also when the label is newer than `now`
+    const until = r.at.getTime() + rule.days * 24 * 3_600_000;
+    if (until <= now.getTime()) continue;
+    if (rule.scope === "repo" || r.type === type) {
+      return `rejected as ${r.reason} (${r.url}): paused ${rule.scope === "repo" ? "in this repository" : `for ${r.type} here`} until ${new Date(until).toISOString()}`;
+    }
+  }
+  return null;
+}
+
+/** True while any spam rejection, in any repository, is under 30 days old: slow down overall. */
+export function slowedDown(rejections: Rejection[], now: Date): boolean {
+  return rejections.some((r) => r.reason === "spam" && now.getTime() - r.at.getTime() < REJECTIONS.spam.days * 24 * 3_600_000);
+}

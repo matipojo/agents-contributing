@@ -25,9 +25,6 @@ const RUNNER_TOPIC = "agents-contributing-runner";
 export const VERSION = `agents-contributing/${JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version}`;
 export const WORK = join(HOME, "work");
 
-/** The marker's provider field for each adapter; `declared` names no vendor. */
-const VENDORS: Record<string, string> = { "claude-code": "anthropic", codex: "openai" };
-
 export interface Context {
   cfg: ContributorConfig;
   gh: GitHub;
@@ -103,7 +100,7 @@ export async function setup(
     // not readable: treat as absent
   }
   if (!runnerRepo) notes.push(`No runner repository, so contributions are logged in ${join(HOME, "contributions.jsonl")}.`);
-  return { ctx: { cfg, gh, login, runnerRepo, vendor: VENDORS[cfg.provider] ?? cfg.provider, dryRun, forced: flags.force, notes } };
+  return { ctx: { cfg, gh, login, runnerRepo, vendor: adapter.vendor, dryRun, forced: flags.force, notes } };
 }
 
 /**

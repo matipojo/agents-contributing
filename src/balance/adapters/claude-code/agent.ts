@@ -8,7 +8,6 @@ import { CLAUDE_BIN } from "./adapter.ts";
  * why the runner must run in an isolated, disposable environment (spec obligation 9).
  */
 export const claudeAgent: Agent = {
-  vendor: "anthropic",
   run({ cwd, prompt, write }) {
     const out = execFileSync(CLAUDE_BIN, [
       "-p", "--output-format", "json", "--no-session-persistence", "--strict-mcp-config",

@@ -11,7 +11,6 @@ import { CODEX_BIN, codexHome, findRollout } from "./adapter.ts";
  * the runner did not give it. The model comes from the session file Codex saves.
  */
 export const codexAgent: Agent = {
-  vendor: "openai",
   run({ cwd, prompt, write }) {
     const out = join(mkdtempSync(join(tmpdir(), "ac-codex-")), "last.txt");
     const events = execFileSync(CODEX_BIN, [

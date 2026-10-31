@@ -31,7 +31,6 @@ jobs:
     env:
       AGENTS_CONTRIBUTING_HOME: ${{ github.workspace }}
       AGENTS_CONTRIBUTING_GITHUB_TOKEN: ${{ secrets.AGENTS_CONTRIBUTING_GITHUB_TOKEN }}
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,12 +44,13 @@ jobs:
           npm --prefix "$RUNNER_TEMP/tools" ci --silent
 
       - name: Install the agent
+        # The provider's adapter says how; it fails here if the provider cannot run in Actions.
+        env:
+          SECRETS_JSON: ${{ toJSON(secrets) }}
         run: |
-          provider=$(sed -n 's/^provider:[[:space:]]*\([a-z-]*\).*/\1/p' contributor.yml)
-          case "$provider" in
-            claude-code) npm install --global --silent @anthropic-ai/claude-code ;;
-            *) echo "::error::provider '$provider' cannot run in GitHub Actions yet. See the provider's README."; exit 1 ;;
-          esac
+          "$RUNNER_TEMP/tools/node_modules/.bin/tsx" "$RUNNER_TEMP/tools/src/cli/provider.ts" ci-install contributor.yml
+          # Export only the secret the adapter declares (ci.secret.name), for the next steps.
+          "$RUNNER_TEMP/tools/node_modules/.bin/tsx" "$RUNNER_TEMP/tools/src/cli/provider.ts" ci-env contributor.yml
 
       - name: Keep the runner repository closed
         continue-on-error: true

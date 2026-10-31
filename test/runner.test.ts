@@ -113,7 +113,8 @@ test("the provider is detected from the agent the runner is called from", async 
   const { detectProvider } = await import("../src/balance/config.ts");
   assert.equal(detectProvider({ CODEX_THREAD_ID: "t" }), "codex");
   assert.equal(detectProvider({ CLAUDECODE: "1" }), "claude-code");
-  assert.equal(detectProvider({}), "claude-code");
+  // An agent no adapter recognizes still works, through the fallback.
+  assert.equal(detectProvider({}), "declared");
 });
 
 test("findToken prefers AGENTS_CONTRIBUTING_GITHUB_TOKEN over the gh login", async () => {

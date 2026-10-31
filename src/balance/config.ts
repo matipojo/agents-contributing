@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
+import { detectAdapter } from "./adapters/index.ts";
 
 export interface ContributorConfig {
   version: number;
@@ -33,7 +34,7 @@ export const DEFAULT_CONFIG_PATH = join(HOME, "contributor.yml");
 
 const DEFAULTS: ContributorConfig = {
   version: 1,
-  provider: "claude-code",
+  provider: "declared",
   targets: { repos: [], topics: ["agents-contributing"] },
   help_types: ["audit", "pr", "review", "reproduce", "triage", "tests", "docs"],
   budget: { window: "seven_day", lead_hours: 24, margin_pct: 10, donate_fraction: 1, min_surplus_pct: 5 },
@@ -44,13 +45,12 @@ const DEFAULTS: ContributorConfig = {
 };
 
 /**
- * The agent the runner is called from, when the config does not say: Codex and Claude Code
- * both mark the commands they run. Outside either, Claude Code.
+ * The agent the runner is called from, when the config does not say. Each adapter knows how
+ * to recognize its own agent; an agent without an adapter gets the fallback, which works with
+ * no usage reading at all.
  */
 export function detectProvider(env: NodeJS.ProcessEnv = process.env): string {
-  if (env.CODEX_THREAD_ID) return "codex";
-  if (env.CLAUDECODE === "1") return "claude-code";
-  return "claude-code";
+  return detectAdapter(env).name;
 }
 
 /** A missing config at the default path means "use the defaults", so a routine needs no setup. */

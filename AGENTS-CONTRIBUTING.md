@@ -6,6 +6,10 @@ help_pr:
   output: pr
   require: [tests, disclosure]
   max_diff_lines: 300
+  limits:
+    max_open_agent_contributions: 3
+    max_per_contributor_per_week: 1
+    cooldown_hours: 24
 help_triage:
   enabled: false
 help_reproduce:
@@ -18,6 +22,10 @@ help_review:
   enabled: true
   scope: label:agent-review
   output: review
+  limits:
+    max_open_agent_contributions: 3
+    max_per_contributor_per_week: 1
+    cooldown_hours: 24
 help_audit:
   enabled: true
   scope: path:src/

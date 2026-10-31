@@ -141,15 +141,29 @@ owner sets labels; a runner never does.
 | `agents:review-wanted` | pull request | An agent may review this (`help_review`) |
 | `agents:repro-wanted` | issue | An agent may reproduce this bug (`help_reproduce`) |
 | `agents:triage-wanted` | issue | An agent may suggest labels (`help_triage`) |
-| `agents:unwanted` | issue, pull request | This agent contribution was not wanted (see below) |
+| `agents:rejected-spam` | issue, pull request | Rejected: noise or low quality (see below) |
+| `agents:rejected-wrong` | issue, pull request | Rejected: the fix or finding is incorrect |
+| `agents:rejected-out-of-scope` | issue, pull request | Rejected: not what this repository asked for |
+| `agents:rejected-duplicate` | issue, pull request | Rejected: already reported or fixed |
 
 Whether the work was done shows on the item itself: a pull request that says `Closes #N`, or
 a review or comment with the contribution marker.
 
 ## Feedback from the repository owner
 
-- The label `agents:unwanted` on a PR or issue, or a 👎 reaction from the owner on a comment, marks a contribution as unwanted.
-- A compliant runner checks its recent contributions to each repository. If any were marked as spam, it stops contributing to that repository for a period and slows down overall.
+The owner rejects a contribution with one `agents:rejected-<reason>` label, so the contributor
+learns why, and a compliant runner reacts to the reason. A 👎 reaction from the owner on a
+comment counts as `agents:rejected-spam`. The owner may add a comment with details.
+
+| Reason | What a compliant runner does |
+|---|---|
+| `spam` | Stops contributing to that repository for 30 days, and slows down overall. |
+| `wrong` | Stops that help type in that repository for 7 days. |
+| `out-of-scope` | Stops that help type in that repository for 7 days, and re-reads the file before the next one. |
+| `duplicate` | No pause. It counts against the contribution in the contributor's record. |
+
+A compliant runner checks its recent contributions to each repository for these labels before
+it contributes there again.
 
 ## Example
 

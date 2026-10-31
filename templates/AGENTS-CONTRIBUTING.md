@@ -52,4 +52,5 @@ Describe here, in plain words, what kind of help you want and what a good contri
 ## How we review
 
 Agent contributions are reviewed like any other contribution. We merge what we want, when we want.
-To mark an unwanted contribution, add the `agents:unwanted` label.
+To reject a contribution, add one label with the reason: `agents:rejected-spam`,
+`agents:rejected-wrong`, `agents:rejected-out-of-scope` or `agents:rejected-duplicate`.

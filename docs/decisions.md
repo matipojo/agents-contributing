@@ -38,11 +38,11 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 
 ## Runner and safety
 
-22. We decided the runner runs in isolated, disposable environments such as GitHub Actions, not on the contributor's machine, because every run then starts clean and is thrown away.
-23. We decided the subscription is connected through the provider's long-lived token stored as a secret, because the run then uses the surplus without an API key.
+22. We decided the runner runs in isolated, disposable environments such as GitHub Actions, not on the contributor's machine, because every run then starts clean and is thrown away. (Superseded by 61.)
+23. We decided the subscription is connected through the provider's long-lived token stored as a secret, because the run then uses the surplus without an API key. (Superseded by 61.)
 24. We decided everything the runner reads from another repository, including `AGENTS-CONTRIBUTING.md` itself, is data and not instructions, because a malicious owner or issue author can plant prompt injection.
 25. We decided to limit network egress to the AI provider and GitHub, and to sandbox shell commands, because then even a successful injection cannot send the token out.
-26. We decided the runner uses a narrowly scoped GitHub token: public repositories, pull requests and comments only, because a compromised runner then does limited damage.
+26. We decided the runner uses a narrowly scoped GitHub token: public repositories, pull requests and comments only, because a compromised runner then does limited damage. (Superseded by 62.)
 27. We decided runners update automatically only to signed releases, and only 72 hours after release, because that gives time to catch a malicious release.
 
 ## Runner repositories
@@ -62,7 +62,7 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 34. We decided the main marker is a visible line at the end of the pull request or comment body, because the body always survives and GitHub search finds visible text.
 35. We decided a commit trailer is only an addition, because squash merges can drop it.
 36. We decided the marker never includes token counts or plan type, because that would reveal what the contributor pays.
-37. We decided the runner appends each contribution to `contributions.jsonl` in the runner repository, because every contributor then has a full record without a server.
+37. We decided the runner appends each contribution to `contributions.jsonl` in the runner repository, because every contributor then has a full record without a server. (Superseded by 63.)
 38. We decided the log is on by default and can be turned off, because contributions are public anyway, and turning it off only gives up attribution.
 39. We decided a log line counts only after checking the contribution exists and was authored by the same account, because markers and logs alone can be faked.
 40. We decided not to count contributions to the contributor's own repositories, because that is the cheapest way to inflate numbers.
@@ -86,6 +86,10 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 55. We decided credits are donated only in the last three days before they expire, at most $15 per daily run, and the owner gets one reminder a week before, because the remaining amount is not exposed and a large unused balance cannot be spent usefully in the last day.
 56. We decided to add an `audit` help type whose output is an `issue`, one per finding, because finding bugs is help a repository can ask for, and opening an issue needs no permissions. The owner still picks what gets fixed, by labeling the issue for `help_pr`.
 57. We decided the runner is code and the agent only does the work it is handed, because limits, scope, forbidden paths, change size, required tests, the marker and the log must hold whatever the agent does, and repository text must never reach the agent as instructions.
-58. We decided the runner never contributes without the runner repository, and without a GitHub token it only does a dry run, because every contribution must be logged, and the runner must never borrow a session's own GitHub access.
-59. We decided the runner runs from a GitHub Actions workflow in the runner repository, set up by one script the user runs once, because then nothing runs on the contributor's machine, every agent is scheduled the same way, and the user only approves two browser pages and pastes two tokens into hidden prompts.
-60. We decided the runner's GitHub token is a classic token with only the `public_repo` scope, because a fine-grained token cannot open issues or pull requests in repositories owned by others, and `public_repo` cannot touch private repositories.
+58. We decided the runner never contributes without the runner repository, and without a GitHub token it only does a dry run, because every contribution must be logged, and the runner must never borrow a session's own GitHub access. (Superseded by 62 and 63.)
+59. We decided the runner runs from a GitHub Actions workflow in the runner repository, set up by one script the user runs once, because then nothing runs on the contributor's machine, every agent is scheduled the same way, and the user only approves two browser pages and pastes two tokens into hidden prompts. (Superseded by 61.)
+60. We decided the runner's GitHub token is a classic token with only the `public_repo` scope, because a fine-grained token cannot open issues or pull requests in repositories owned by others, and `public_repo` cannot touch private repositories. (Superseded by 62.)
+61. We decided the agent's own provider schedules the runner and keeps the agent signed in, with a routine or automation (Claude Code, Cursor, Codex), and the agent drives the runner with `run.ts next` and `submit`, because then the project handles no provider login at all, and every agent joins the same way.
+62. We decided the runner writes to GitHub with the login the user's GitHub CLI already has, or with `AGENTS_CONTRIBUTING_GITHUB_TOKEN` where there is none, such as a cloud routine, because a separate token was the step people would not take, and the runner's own checks, not the token's scope, are what keep contributions within each repository's rules.
+63. We decided the runner repository is optional: without it the log stays on the contributor's machine and the marker names the contributor, because attribution already travels with every contribution, and a public log is an extra the contributor can add later.
+64. We decided joining needs no config file: the provider is the agent calling the runner, and the defaults donate only near the reset with a margin, to repositories that opted in, because every question asked at setup is a reason not to finish it.

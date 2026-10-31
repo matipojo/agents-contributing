@@ -3,6 +3,24 @@
  * repositories; every write needs one. Only repository-scoped endpoints are used for reads,
  * so the runner also works where repository search is unavailable.
  */
+import { execFileSync } from "node:child_process";
+
+/**
+ * The GitHub token to write with: AGENTS_CONTRIBUTING_GITHUB_TOKEN when set, otherwise the one
+ * the user's GitHub CLI is already logged in with. Null means a dry run.
+ */
+export function findToken(): { token: string | null; source: string } {
+  const own = process.env.AGENTS_CONTRIBUTING_GITHUB_TOKEN?.trim();
+  if (own) return { token: own, source: "AGENTS_CONTRIBUTING_GITHUB_TOKEN" };
+  try {
+    const gh = execFileSync("gh", ["auth", "token"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 15_000 }).trim();
+    if (gh) return { token: gh, source: "gh auth token" };
+  } catch {
+    // no gh, or not logged in
+  }
+  return { token: null, source: "none" };
+}
+
 export interface Issue {
   number: number;
   title: string;
@@ -138,7 +156,7 @@ export class GitHub {
    * not the URL or the arguments, so a failed push never prints it.
    */
   gitAuthEnv(): NodeJS.ProcessEnv {
-    if (!this.token) throw new Error("Pushing needs a token. Set AGENTS_CONTRIBUTING_GITHUB_TOKEN.");
+    if (!this.token) throw new Error("Pushing needs a GitHub login. Run `gh auth login` once.");
     const basic = Buffer.from(`x-access-token:${this.token}`).toString("base64");
     return { ...process.env, GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader", GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}` };
   }

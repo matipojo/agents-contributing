@@ -15,13 +15,13 @@
  *   --dry-run  do everything except writing to GitHub; print what would be submitted
  *   --force    contribute even when the balance check says not to (recorded in the output and log)
  *
- * Writing needs AGENTS_CONTRIBUTING_GITHUB_TOKEN: a classic token with only the public_repo
- * scope. Without it every run is a dry run. Exit codes: 0 done, 10 nothing to do, 2 error.
+ * Writing uses the GitHub CLI's login (`gh auth login`, once), or AGENTS_CONTRIBUTING_GITHUB_TOKEN
+ * when set. Without either every run is a dry run. Exit codes: 0 done, 10 nothing to do, 2 error.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { DEFAULT_CONFIG_PATH, loadConfig } from "../balance/config.ts";
 import { ADAPTERS } from "../balance/adapters/index.ts";
-import { GitHub } from "../runner/github.ts";
+import { findToken, GitHub } from "../runner/github.ts";
 import { loadTask, pick, prepare, setup, submit } from "../runner/flow.ts";
 
 const args = process.argv.slice(2);
@@ -36,7 +36,7 @@ const taskId = mode === "submit" ? args.shift() : undefined;
 const force = take("--force") === true;
 const dryRunFlag = take("--dry-run") === true;
 const model = take("--model", true);
-const token = process.env.AGENTS_CONTRIBUTING_GITHUB_TOKEN?.trim() || null;
+const { token } = findToken();
 const cfg = loadConfig(args[0] ?? DEFAULT_CONFIG_PATH);
 const notes: string[] = [];
 
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     const t = loadTask(taskId);
     if (!existsSync(t.replyFile)) throw new Error(`No reply at ${t.replyFile}. Write the JSON the task asked for there first.`);
     const gh = new GitHub(t.dryRun ? null : token);
-    if (!t.dryRun && !token) throw new Error("This task was prepared for a real run; AGENTS_CONTRIBUTING_GITHUB_TOKEN is missing.");
+    if (!t.dryRun && !token) throw new Error("This task was prepared for a real run, and there is no GitHub login. Run `gh auth login` once.");
     const done = await submit(cfg, gh, t, readFileSync(t.replyFile, "utf8"), typeof model === "string" ? model : "unknown", notes);
     finish(done.rejected || done.aborted ? 2 : 0, { dry_run: t.dryRun, forced: t.forced, ...done });
   }

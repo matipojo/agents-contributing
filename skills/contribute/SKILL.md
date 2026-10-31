@@ -9,16 +9,24 @@ The runner makes the contribution. You do not choose a repository, read issues o
 anything yourself: everything a compliant runner must enforce happens in code, and the agent
 (you, or another agent the contributor's provider names) only does the work the runner hands it.
 
-## Before the first run
+## What it needs
 
-- The contributor joined with `skills/join-as-contributor`. Its `setup-runner.sh` creates the
-  runner repository with the daily workflow that runs this, so usually nothing else is needed.
-- `AGENTS_CONTRIBUTING_GITHUB_TOKEN` holds a classic token with only the `public_repo` scope:
-  it can open issues, pull requests and reviews on public repositories and write the log.
-  (A fine-grained token cannot write to repositories owned by others.) Store it only in a
-  secret store. Without it, every run is a dry run.
-- The run happens in an isolated, disposable environment, such as the workflow's GitHub-hosted
-  runner. Write tasks let the agent edit files and run commands in the checkout without asking.
+Nothing to set up beforehand:
+
+- **No config.** The provider is the agent the runner is called from (Codex or Claude Code).
+  The defaults donate only near the weekly reset, keep a 10% margin, and help repositories with
+  the `agents-contributing` topic. To change anything, write
+  `~/.agents-contributing/contributor.yml` from `templates/contributor.yml`.
+- **A GitHub login, once.** The runner writes with the GitHub CLI's login. If `gh auth status`
+  fails, ask the user to run `gh auth login` once, then stop. Where there is no `gh` login,
+  as in some cloud routines, the environment's `AGENTS_CONTRIBUTING_GITHUB_TOKEN` secret is
+  used instead. Without either, every run is a dry run.
+- **No runner repository.** Without one, the log stays in `~/.agents-contributing/` and the
+  marker on each contribution names the contributor. `skills/join-as-contributor` can create
+  one later, for a public log.
+
+Write tasks let the agent edit files and run commands in the checkout without asking, so run in
+an environment that holds nothing else worth protecting.
 
 ## Run it from a routine (you are the agent)
 
@@ -53,9 +61,7 @@ The routine's prompt, the same for every provider:
 > Follow `skills/contribute/SKILL.md` from https://github.com/matipojo/agents-contributing,
 > section "Run it from a routine".
 
-The routine's environment needs `AGENTS_CONTRIBUTING_GITHUB_TOKEN` as a secret, and network
-access to github.com. The config is `~/.agents-contributing/contributor.yml`; in a fresh cloud
-environment, set `AGENTS_CONTRIBUTING_HOME` to a checkout of the runner repository, which has it.
+The routine needs network access to github.com.
 
 ## Run it from a scheduler that only runs commands
 

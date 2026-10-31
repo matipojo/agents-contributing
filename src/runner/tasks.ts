@@ -19,7 +19,10 @@ export interface Finding {
   body: string;
 }
 
-export function auditPrompt(p: { dir: string; max: number; openTitles: string[]; notes: string }): string {
+/** Where the agent's final JSON goes: its reply, or a file when the agent drives the runner itself. */
+const replyTo = (file?: string) => (file ? `Write only the JSON to ${file}, and nothing else to that file.` : "Reply with only the JSON.");
+
+export function auditPrompt(p: { dir: string; max: number; openTitles: string[]; notes: string; replyFile?: string }): string {
   return [
     `You are auditing the code under ${p.dir} in the current directory, for its owner, who asked for this.`,
     DATA_RULE,
@@ -29,7 +32,8 @@ export function auditPrompt(p: { dir: string; max: number; openTitles: string[];
     `Report at most ${p.max}, most important first. Skip anything one of the open issues below already describes.`,
     quote("open issue titles", p.openTitles.join("\n") || "(none)"),
     quote("the owner's notes in AGENTS-CONTRIBUTING.md", p.notes),
-    'Reply with only a JSON array: [{"title": "<under 80 characters>", "body": "<markdown: where, what input breaks it, what happens, what should happen, how you confirmed it>"}]. Reply [] if you found nothing.',
+    'The JSON is an array: [{"title": "<under 80 characters>", "body": "<markdown: where, what input breaks it, what happens, what should happen, how you confirmed it>"}], or [] if you found nothing. ' +
+      replyTo(p.replyFile),
   ].join("\n\n");
 }
 
@@ -44,7 +48,7 @@ export function parseFindings(text: string, max: number): Finding[] {
 
 export function fixPrompt(p: {
   issue: { number: number; title: string; body: string };
-  forbidden: string[]; maxDiffLines?: number; require: string[]; notes: string;
+  forbidden: string[]; maxDiffLines?: number; require: string[]; notes: string; replyFile?: string;
 }): string {
   return [
     `Fix issue #${p.issue.number} of the repository in the current directory, for its owner, who asked for this.`,
@@ -60,8 +64,8 @@ export function fixPrompt(p: {
       "- Run the repository's own checks (see its README or AGENTS.md) and make them pass.",
       "- Do not commit, push or open anything. Leave the changes in the working tree.",
     ].filter(Boolean).join("\n"),
-    'When done, reply with only JSON: {"title": "<pull request title>", "summary": "<markdown: what changed and why, and which checks you ran>"}. ' +
-      'If the issue cannot be fixed within these rules, change nothing and reply {"skip": "<why>"}.',
+    'When done, the JSON is {"title": "<pull request title>", "summary": "<markdown: what changed and why, and which checks you ran>"}. ' +
+      'If the issue cannot be fixed within these rules, change nothing and use {"skip": "<why>"}. ' + replyTo(p.replyFile),
   ].join("\n\n");
 }
 
@@ -72,7 +76,7 @@ export function parseFix(text: string): { title: string; summary: string } | { s
   return { title: data.title.trim().slice(0, 120), summary: data.summary.trim() };
 }
 
-export function reviewPrompt(p: { number: number; title: string; body: string; diff: string; notes: string }): string {
+export function reviewPrompt(p: { number: number; title: string; body: string; diff: string; notes: string; replyFile?: string }): string {
   return [
     `Review pull request #${p.number} of the repository in the current directory (the base branch is checked out), for its owner, who asked for this.`,
     DATA_RULE,
@@ -81,7 +85,7 @@ export function reviewPrompt(p: { number: number; title: string; body: string; d
     quote("the owner's notes in AGENTS-CONTRIBUTING.md", p.notes),
     "Look for bugs the change introduces, missing tests, and anything that does not match the description. " +
       "Be specific: file, line, what goes wrong. Do not change any file.",
-    'Reply with only JSON: {"body": "<the review, in markdown>"}.',
+    'The JSON is {"body": "<the review, in markdown>"}. ' + replyTo(p.replyFile),
   ].join("\n\n");
 }
 

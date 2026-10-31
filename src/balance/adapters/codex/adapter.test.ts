@@ -67,3 +67,26 @@ test("parseRollout rejects missing usage instead of reading it as 0", () => {
   const { windows } = parseRollout(line({ ...LIMITS, primary: { ...LIMITS.primary, used_percent: null } }));
   assert.deepEqual(windows.map((w) => w.name), ["seven_day"]);
 });
+
+test("inside a Codex session, check-balance reads that session's file instead of launching Codex", () => {
+  const home = mkdtempSync(join(tmpdir(), "ac-"));
+  const codexHome = join(home, "codex-home");
+  const day = join(codexHome, "sessions", "2026", "10", "31");
+  mkdirSync(day, { recursive: true });
+  const now = Math.floor(Date.now() / 1000);
+  writeFileSync(join(day, "rollout-2026-10-31T00-00-00-own-thread.jsonl"), line({
+    ...LIMITS,
+    primary: { used_percent: 5, window_minutes: 300, resets_at: now + 7200 },
+    secondary: { used_percent: 30, window_minutes: 10080, resets_at: now + 10 * 3600 },
+  }));
+  writeFileSync(join(home, "contributor.yml"), "provider: codex\n");
+  const r = spawnSync(process.execPath, ["--import", "tsx", "src/cli/check-balance.ts"], {
+    encoding: "utf8",
+    // A binary that does not exist: the check must not try to launch Codex.
+    env: { ...process.env, AGENTS_CONTRIBUTING_HOME: home, AGENTS_CONTRIBUTING_CODEX_BIN: join(home, "missing"), CODEX_HOME: codexHome, CODEX_THREAD_ID: "own-thread" },
+  });
+  const out = JSON.parse(r.stdout);
+  assert.equal(r.status, 0, r.stdout);
+  assert.equal(out.used_pct, 30);
+  assert.match(out.source, /own-thread\.jsonl$/);
+});

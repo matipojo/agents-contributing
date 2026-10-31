@@ -37,3 +37,9 @@ writing the refreshed file back after every run
 needs a token with far more access than the runner's `public_repo` token, so the workflow does
 not support Codex yet. Run the runner from a machine where Codex is signed in instead, with the
 routine prompt in `skills/check-balance/SKILL.md`.
+
+## Inside a Codex routine or automation
+
+When the runner is called from Codex itself (`run.ts next`), Codex sets `CODEX_THREAD_ID` for the
+commands it runs. The adapter then reads the limits from that session's own file, instead of
+launching a second Codex, which its sandbox would refuse.

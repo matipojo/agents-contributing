@@ -36,6 +36,8 @@ export function nextWeekly(spec: string, timeZone: string, now: Date): Date {
  */
 export const declared: Adapter = {
   name: "declared",
+  // The fallback for any agent without an adapter of its own: it never detects itself.
+  vendor: "unknown",
   read(cfg, now) {
     const resetsAt = nextWeekly(cfg.declared.weekly_reset, cfg.declared.timezone, now);
     return {

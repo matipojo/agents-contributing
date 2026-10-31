@@ -58,22 +58,24 @@ printf '%s' "$TOKEN" | gh secret set AGENTS_CONTRIBUTING_GITHUB_TOKEN --repo "$R
 unset TOKEN
 
 step "4/5  Your agent's subscription"
-PROVIDER=$(sed -n 's/^provider:[[:space:]]*\([a-z-]*\).*/\1/p' "$CONFIG")
-case "$PROVIDER" in
-  claude-code)
-    echo "Claude Code now opens your browser to create a long-lived token for your subscription."
-    echo "When it prints the token, copy it."
-    claude setup-token
+PROVIDER_CLI=("$TOOLS/node_modules/.bin/tsx" "$TOOLS/src/cli/provider.ts")
+if ! "${PROVIDER_CLI[@]}" ci-secret name "$CONFIG" >/dev/null 2>&1; then
+  echo "  Your agent cannot run in GitHub Actions yet (see its README under src/balance/adapters/)."
+  echo "  Everything else is ready; run the routine from your agent instead."
+else
+  SECRET_NAME=$("${PROVIDER_CLI[@]}" ci-secret name "$CONFIG")
+  SECRET_COMMAND=$("${PROVIDER_CLI[@]}" ci-secret command "$CONFIG")
+  if [ -n "$SECRET_NAME" ]; then
+    "${PROVIDER_CLI[@]}" ci-secret help "$CONFIG"
+    [ -n "$SECRET_COMMAND" ] && $SECRET_COMMAND
     read -r -s -p "  Paste that token here (it is not shown): " TOKEN; echo
     [ -n "$TOKEN" ] || { echo "No token given."; exit 1; }
-    printf '%s' "$TOKEN" | gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo "$REPO"
+    printf '%s' "$TOKEN" | gh secret set "$SECRET_NAME" --repo "$REPO"
     unset TOKEN
-    ;;
-  *)
-    echo "  The '$PROVIDER' provider cannot run in GitHub Actions yet (see its README)."
-    echo "  Everything else is ready; the daily workflow will report this until it is supported."
-    ;;
-esac
+  else
+    echo "  Your agent needs no secret of its own."
+  fi
+fi
 
 step "5/5  A first dry run"
 gh workflow enable contribute.yml --repo "$REPO" >/dev/null 2>&1 || true

@@ -129,6 +129,55 @@ test("findToken prefers AGENTS_CONTRIBUTING_GITHUB_TOKEN over the gh login", asy
   }
 });
 
+for (const [provider, vendor] of [["codex", "openai"], ["claude-code", "anthropic"]] as const) {
+  test(`${provider}: selection and submission honor the same provider aliases`, async () => {
+    const { pick, submit } = await import("../src/runner/flow.ts");
+    const { GitHub } = await import("../src/runner/github.ts");
+    const { execFileSync } = await import("node:child_process");
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const dir = mkdtempSync(join(tmpdir(), "ac-provider-"));
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    let providers = `allow: [${provider}]`;
+    const gh = new GitHub(null);
+    gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+    gh.file = async () => `---
+version: 1
+providers:
+  ${providers}
+help_audit:
+  enabled: true
+  scope: path:src/
+  output: issue
+limits:
+  max_open_agent_contributions: 3
+  max_per_contributor_per_week: 1
+  cooldown_hours: 0
+---
+`;
+    gh.issues = async () => [];
+    const { loadConfig } = await import("../src/balance/config.ts");
+    const cfg = { ...loadConfig("templates/contributor.yml"), provider, targets: { repos: ["owner/repo"], topics: [] }, help_types: ["audit"], log: false };
+    const ctx = { cfg, gh, login: "me", runnerRepo: null, vendor, dryRun: true, forced: false, notes: [] };
+    const task: import("../src/runner/flow.ts").TaskState = {
+      id: "provider-test", type: "audit", repo: "owner/repo", dir, baseSha: "", defaultBranch: "main",
+      pushAccess: false, scope: "path:src/", forbidden: [], require: [], prompt: "", replyFile: "",
+      runnerRepo: null, login: "me", vendor, provider, forced: false, dryRun: true,
+    };
+    const reply = JSON.stringify([{ title: "A bug", body: "Details" }]);
+    try {
+      assert.ok((await pick(ctx)).task, "the provider alias is accepted during selection");
+      assert.deepEqual((await submit(cfg, gh, task, reply, "test", [])).submitted, ["(dry run) issue: A bug"]);
+      providers = `allow: [${vendor}]\n  deny: [${provider}]`;
+      assert.equal((await pick(ctx)).task, undefined);
+      assert.equal((await submit(cfg, gh, task, reply, "test", [])).aborted, "the providers list now excludes this agent");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
 test("a scope label with a colon in its name, such as agents:fix-wanted, picks the right issue", async () => {
   const { pick } = await import("../src/runner/flow.ts");
   const { GitHub } = await import("../src/runner/github.ts");

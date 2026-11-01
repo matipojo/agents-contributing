@@ -173,3 +173,12 @@ export function rejectionPause(rejections: Rejection[], type: string, now: Date)
 export function slowedDown(rejections: Rejection[], now: Date): boolean {
   return rejections.some((r) => r.reason === "spam" && now.getTime() - r.at.getTime() < REJECTIONS.spam.days * 24 * 3_600_000);
 }
+
+/**
+ * Whether a review may run a pull request's code (its tests, its checks). That runs its
+ * author's code where the contributor's GitHub login is, so only for a pull request this
+ * contributor opened, or one whose author has write access to the repository.
+ */
+export function mayRunPullCode(pull: { user: { login: string } | null; author_association?: string }, me: string): boolean {
+  return pull.user?.login === me || ["OWNER", "MEMBER", "COLLABORATOR"].includes(pull.author_association ?? "");
+}

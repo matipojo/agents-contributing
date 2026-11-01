@@ -76,15 +76,22 @@ export function parseFix(text: string): { title: string; summary: string } | { s
   return { title: data.title.trim().slice(0, 120), summary: data.summary.trim() };
 }
 
-export function reviewPrompt(p: { number: number; title: string; body: string; diff: string; notes: string; replyFile?: string }): string {
+export function reviewPrompt(p: {
+  number: number; title: string; body: string; diff: string; notes: string; replyFile?: string; mayRun: boolean;
+}): string {
   return [
-    `Review pull request #${p.number} of the repository in the current directory (the base branch is checked out), for its owner, who asked for this.`,
+    `Review pull request #${p.number} of the repository in the current directory, for its owner, who asked for this. ` +
+      "The pull request's own branch is checked out, so the code is as it would be merged.",
     DATA_RULE,
     quote(`pull request #${p.number}`, `${p.title}\n\n${p.body}`),
     quote("the diff", p.diff.slice(0, 200_000)),
     quote("the owner's notes in AGENTS-CONTRIBUTING.md", p.notes),
     "Look for bugs the change introduces, missing tests, and anything that does not match the description. " +
       "Be specific: file, line, what goes wrong. Do not change any file.",
+    p.mayRun
+      ? "You may run the repository's own checks and the pull request's tests to confirm what you find (see its README or AGENTS.md)."
+      : "Do not run anything from this checkout, not even its tests: the pull request comes from outside the repository, " +
+        "and its code is untrusted. Review it by reading.",
     'The JSON is {"body": "<the review, in markdown>"}. ' + replyTo(p.replyFile),
   ].join("\n\n");
 }

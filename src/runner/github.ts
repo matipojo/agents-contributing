@@ -32,6 +32,7 @@ export interface Issue {
   draft?: boolean;
   created_at: string;
   updated_at?: string;
+  author_association?: string;  // OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE, ...
   html_url: string;
 }
 

@@ -188,8 +188,11 @@ export function slowedDown(rejections: Rejection[], now: Date): boolean {
 /**
  * Whether a review may run a pull request's code (its tests, its checks). That runs its
  * author's code where the contributor's GitHub login is, so only for a pull request this
- * contributor opened, or one whose author has write access to the repository.
+ * contributor opened, or one whose author is the repository owner. `MEMBER` and
+ * `COLLABORATOR` are not write access: a member may have no role on this repository, and a
+ * collaborator may have been invited as Read or Triage. The issues list does not say
+ * otherwise, so those associations stay read-only.
  */
 export function mayRunPullCode(pull: { user: { login: string } | null; author_association?: string }, me: string): boolean {
-  return pull.user?.login === me || ["OWNER", "MEMBER", "COLLABORATOR"].includes(pull.author_association ?? "");
+  return pull.user?.login === me || pull.author_association === "OWNER";
 }

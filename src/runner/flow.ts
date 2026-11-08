@@ -133,14 +133,37 @@ function pastContributions(items: Issue[], t: { repo: string; login: string; dry
   return past;
 }
 
+/** URL, or id when the review has no URL. The same value from GitHub and the local log is one contribution. */
+function reviewIdentity(e: { html_url?: string | null; url?: string | null; id?: number | string | null }): string | undefined {
+  for (const value of [e.html_url, e.url]) {
+    if (typeof value === "string" && value !== "") return value;
+  }
+  if (typeof e.id === "number" && Number.isFinite(e.id)) return `id:${e.id}`;
+  if (typeof e.id === "string" && e.id !== "") return `id:${e.id}`;
+  return undefined;
+}
+
+/**
+ * True when a logged review is one already recorded. Distinct URLs or ids are distinct
+ * reviews even a minute apart. A GitHub review that carried neither still matches the log
+ * line for that same submission time.
+ */
+function sameReview(c: Contribution & { url?: string }, url: string | undefined, at: Date): boolean {
+  if (c.url && url) return c.url === url;
+  // An unnamed GitHub review is the log line from that same submission. Two
+  // named reviews stay distinct even when their timestamps match.
+  if (!c.url) return c.at.getTime() === at.getTime();
+  return false;
+}
+
 /**
  * Reviews are contributions too, but they are not issue bodies. Marked reviews on the pull
  * requests we already listed count toward weekly and cooldown limits (not the open cap: a
  * review is not an open item). The local log covers a review whose pull request was not in
- * that list; a review already seen from GitHub is not counted twice.
+ * that list. Each review URL or id counts once, whether it came from GitHub, the log, or both.
  */
 async function pastWithReviews(gh: GitHub, name: string, items: Issue[], login: string, dryRun: boolean): Promise<Contribution[]> {
-  const past = pastContributions(items, { repo: name, login, dryRun });
+  const past: (Contribution & { url?: string })[] = pastContributions(items, { repo: name, login, dryRun });
   for (const p of items) {
     if (!p.pull_request) continue;
     for (const r of await gh.reviews(name, p.number)) {
@@ -148,24 +171,26 @@ async function pastWithReviews(gh: GitHub, name: string, items: Issue[], login: 
       if (!type || r.user?.login !== login) continue;
       const at = new Date(r.submitted_at ?? p.updated_at ?? p.created_at);
       if (Number.isNaN(at.getTime())) continue;
-      past.push({ type, author: login, open: false, at });
+      const url = reviewIdentity(r);
+      past.push(url ? { type, author: login, open: false, at, url } : { type, author: login, open: false, at });
     }
   }
   if (dryRun) return past;
   const logPath = join(HOME, "contributions.jsonl");
   if (!existsSync(logPath)) return past;
   for (const line of readFileSync(logPath, "utf8").split("\n").filter(Boolean)) {
-    let e: { type?: string; repo?: string; at?: string };
+    let e: { type?: string; repo?: string; at?: string; url?: string | null; html_url?: string | null; id?: number | string | null };
     try {
-      e = JSON.parse(line) as { type?: string; repo?: string; at?: string };
+      e = JSON.parse(line) as { type?: string; repo?: string; at?: string; url?: string | null; html_url?: string | null; id?: number | string | null };
     } catch {
       continue;
     }
     if (e.repo !== name || e.type !== "review" || !e.at) continue;
     const at = new Date(e.at);
     if (Number.isNaN(at.getTime())) continue;
-    const seen = past.some((c) => c.type === "review" && c.author === login && Math.abs(c.at.getTime() - at.getTime()) < 10 * 60_000);
-    if (!seen) past.push({ type: "review", author: login, open: false, at });
+    const url = reviewIdentity(e);
+    const seen = past.some((c) => c.type === "review" && c.author === login && sameReview(c, url, at));
+    if (!seen) past.push(url ? { type: "review", author: login, open: false, at, url } : { type: "review", author: login, open: false, at });
   }
   return past;
 }

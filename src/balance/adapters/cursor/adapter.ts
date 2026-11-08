@@ -76,5 +76,7 @@ export const cursor: Adapter = {
   vendor: "cursor",
   // Cursor sets CURSOR_AGENT=1 for every shell command its agent runs.
   detect: (env) => env.CURSOR_AGENT === "1",
+  // Seen in `ps` as /root/.local/bin/cursor-agent, for the agent that runs the commands.
+  processNames: ["cursor-agent"],
   read,
 };

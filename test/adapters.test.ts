@@ -72,3 +72,10 @@ test("one agent inside another: the nearest in the process tree is the one calli
   // Codex runs commands under its sandbox process, which is what the tree shows.
   assert.equal(detectAdapter(both, () => ["node", "tsx", "bash", "-c", "codex-linux-sandbox"]).name, "codex");
 });
+
+test("Cursor started from inside another agent: the nearer one is the caller", () => {
+  const both = { CLAUDECODE: "1", CURSOR_AGENT: "1" };
+  // `ps` shows the Cursor agent as /root/.local/bin/cursor-agent -p ..., under a Claude Code session.
+  assert.equal(detectAdapter(both, () => ["sh", "-c", "cursor-agent", "-p", "node", "claude"]).name, "cursor");
+  assert.equal(detectAdapter(both, () => ["sh", "-c", "claude", "cursor-agent"]).name, "claude-code");
+});

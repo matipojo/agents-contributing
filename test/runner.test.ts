@@ -359,6 +359,195 @@ test("a marked review counts toward weekly and cooldown limits", async () => {
   }
 });
 
+test("an audit submits only as many findings as the allowance at submit time", async () => {
+  const { submit } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { loadConfig } = await import("../src/balance/config.ts");
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  gh.file = async () => `---
+version: 1
+help_audit:
+  enabled: true
+  scope: path:src/
+  output: issue
+  limits:
+    max_open_agent_contributions: 5
+    max_per_contributor_per_week: 1
+    cooldown_hours: 0
+limits:
+  max_open_agent_contributions: 5
+  max_per_contributor_per_week: 5
+  cooldown_hours: 0
+---
+`;
+  gh.issues = async () => [];
+  const created: string[] = [];
+  gh.createIssue = async (_name, title) => {
+    created.push(title);
+    return { number: created.length, title, body: "", state: "open", user: { login: "me" }, labels: [], created_at: new Date().toISOString(), html_url: `https://example/${created.length}` };
+  };
+  const dir = mkdtempSync(join(tmpdir(), "ac-batch-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["audit"], log: false };
+  const task: import("../src/runner/flow.ts").TaskState = {
+    id: "batch", type: "audit", repo: "owner/repo", dir, baseSha: "", defaultBranch: "main",
+    pushAccess: false, scope: "path:src/", forbidden: [], require: [], max: 5, openTitles: [], prompt: "", replyFile: "",
+    runnerRepo: null, login: "me", vendor: "test", provider: "test", forced: false, dryRun: false,
+  };
+  const reply = JSON.stringify([{ title: "First", body: "One" }, { title: "Second", body: "Two" }]);
+  try {
+    const done = await submit(cfg, gh, task, reply, "test", []);
+    assert.deepEqual(created, ["First"]);
+    assert.deepEqual(done.submitted, ["https://example/1"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("issues follows every page when the caller asks for the whole set", async () => {
+  const { GitHub } = await import("../src/runner/github.ts");
+  const gh = new GitHub(null, "https://example.test");
+  const pages = [100, 100, 100, 50].map((n, p) => Array.from({ length: n }, (_, i) => ({ number: p * 100 + i + 1 })));
+  const seen: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    seen.push(String(url));
+    const body = pages[seen.length - 1] ?? [];
+    return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const all = await gh.issues("owner/repo", "state=open", Number.POSITIVE_INFINITY);
+    assert.equal(all.length, 350);
+    assert.equal(seen.length, 4);
+    assert.match(seen[0] ?? "", /state=open/);
+    assert.match(seen[3] ?? "", /page=4/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("an open contribution older than 30 days still fills the cap, and an old open issue is still a task", async () => {
+  const { pick, submit } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { loadConfig } = await import("../src/balance/config.ts");
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const limits = "limits:\n  max_open_agent_contributions: 1\n  max_per_contributor_per_week: 5\n  cooldown_hours: 0\n";
+  const marker = "agents-contributing: v1 type=audit provider=openai model=m runner=r from=me";
+  const old = {
+    number: 4, title: "Old open bug", body: marker, state: "open", user: { login: "me" }, labels: [] as { name: string }[],
+    created_at: new Date(Date.now() - 40 * 864e5).toISOString(), html_url: "https://example/4",
+  };
+  const calls: { query: string; max?: number }[] = [];
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  gh.issues = async (_name, query, max) => {
+    calls.push({ query, max });
+    // The 30-day query does not return an issue that has not been updated in that time.
+    return query === "state=open" ? [old] : [];
+  };
+  let text = `---\nversion: 1\nhelp_audit:\n  enabled: true\n  scope: path:src/\n  output: issue\n${limits}---\n`;
+  gh.file = async () => text;
+  const created: string[] = [];
+  gh.createIssue = async (_name, title) => {
+    created.push(title);
+    return { ...old, number: 9, title, html_url: "https://example/9" };
+  };
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["audit"], log: false };
+  const ctx = { cfg, gh, login: "me", runnerRepo: null, vendor: "test", dryRun: true, forced: false, notes: [] as string[] };
+
+  const blocked = await pick(ctx);
+  assert.equal(blocked.task, undefined);
+  assert.match(Object.values(blocked.skipped).join(" "), /are open/);
+  assert.ok(calls.some((c) => c.query === "state=open" && c.max === Number.POSITIVE_INFINITY));
+  assert.ok(calls.some((c) => c.query.startsWith("state=all&since=")));
+
+  old.body = "";
+  old.labels = [{ name: "agents:fix-wanted" }];
+  text = `---\nversion: 1\nhelp_pr:\n  enabled: true\n  scope: label:agents:fix-wanted\n  output: pr\n${limits}---\n`;
+  const chosen = await pick({ ...ctx, cfg: { ...cfg, help_types: ["pr"] } });
+  assert.equal(chosen.task?.issue?.number, 4, "a labeled issue with no recent update is still in scope");
+
+  old.body = marker;
+  old.labels = [];
+  text = `---\nversion: 1\nhelp_audit:\n  enabled: true\n  scope: path:src/\n  output: issue\n${limits}---\n`;
+  const dir = mkdtempSync(join(tmpdir(), "ac-open-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  const task: import("../src/runner/flow.ts").TaskState = {
+    id: "old-open", type: "audit", repo: "owner/repo", dir, baseSha: "", defaultBranch: "main",
+    pushAccess: false, scope: "path:src/", forbidden: [], require: [], max: 1, openTitles: [], prompt: "", replyFile: "",
+    runnerRepo: null, login: "me", vendor: "test", provider: "test", forced: false, dryRun: false,
+  };
+  try {
+    const done = await submit(cfg, gh, task, JSON.stringify([{ title: "New bug", body: "Details" }]), "test", []);
+    assert.match(String(done.aborted), /are open/);
+    assert.deepEqual(created, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a help type whose output this runner cannot produce is neither selected nor submitted", async () => {
+  const { pick, submit } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { loadConfig } = await import("../src/balance/config.ts");
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const limits = "limits:\n  max_open_agent_contributions: 3\n  max_per_contributor_per_week: 1\n  cooldown_hours: 0\n";
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  let text = `---\nversion: 1\nhelp_audit:\n  enabled: true\n  scope: path:src/\n  output: comment\n${limits}---\n`;
+  gh.file = async () => text;
+  gh.issues = async () => [];
+  const created: string[] = [];
+  gh.createIssue = async (_name, title) => {
+    created.push(title);
+    return { number: 1, title, body: "", state: "open", user: { login: "me" }, labels: [], created_at: new Date().toISOString(), html_url: "https://example/issues/1" };
+  };
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["audit", "pr"], log: false };
+  const ctx = { cfg, gh, login: "me", runnerRepo: null, vendor: "test", dryRun: true, forced: false, notes: [] as string[] };
+
+  const audit = await pick(ctx);
+  assert.equal(audit.task, undefined);
+  assert.match(Object.values(audit.skipped).join(" "), /help_audit output is comment/);
+
+  text = `---\nversion: 1\nhelp_pr:\n  enabled: true\n  scope: label:agents:fix-wanted\n  output: comment\n${limits}---\n`;
+  gh.issues = async () => [{
+    number: 7, title: "Fix me", body: "", state: "open", user: { login: "someone" },
+    labels: [{ name: "agents:fix-wanted" }], created_at: new Date().toISOString(), html_url: "",
+  }];
+  const pr = await pick({ ...ctx, cfg: { ...cfg, help_types: ["pr"] } });
+  assert.equal(pr.task, undefined, "a labeled issue is still not taken when the output is not a pull request");
+  assert.match(Object.values(pr.skipped).join(" "), /help_pr output is comment/);
+
+  // Prepared while output was issue; the owner switched it to comment before submit.
+  text = `---\nversion: 1\nhelp_audit:\n  enabled: true\n  scope: path:src/\n  output: comment\n${limits}---\n`;
+  const dir = mkdtempSync(join(tmpdir(), "ac-output-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  const task: import("../src/runner/flow.ts").TaskState = {
+    id: "output-test", type: "audit", repo: "owner/repo", dir, baseSha: "", defaultBranch: "main",
+    pushAccess: false, scope: "path:src/", forbidden: [], require: [], prompt: "", replyFile: "",
+    runnerRepo: null, login: "me", vendor: "test", provider: "test", forced: false, dryRun: false,
+  };
+  const reply = JSON.stringify([{ title: "A bug", body: "Details" }, { title: "Another", body: "More" }]);
+  try {
+    const done = await submit(cfg, gh, task, reply, "test", []);
+    assert.match(String(done.aborted), /help_audit output is comment/);
+    assert.deepEqual(created, [], "submit must not publish issues when the configured output is comment");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a review runs a pull request's code only when its author is trusted", async () => {
   const { mayRunPullCode } = await import("../src/runner/policy.ts");
   const { reviewPrompt } = await import("../src/runner/tasks.ts");

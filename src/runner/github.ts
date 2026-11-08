@@ -101,7 +101,7 @@ export class GitHub {
     }
   }
 
-  /** Issues and pull requests, newest first, up to `max`. */
+  /** Issues and pull requests, newest first, up to `max`. Pass `Infinity` to follow every page. */
   async issues(name: string, query: string, max = 300): Promise<Issue[]> {
     const out: Issue[] = [];
     for (let page = 1; out.length < max; page++) {

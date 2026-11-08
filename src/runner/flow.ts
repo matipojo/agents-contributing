@@ -25,6 +25,13 @@ import {
 } from "./tasks.ts";
 
 const RUNNER_TOPIC = "agents-contributing-runner";
+/** The only output this runner writes for each help type. Anything else is skipped, not published as a different kind. */
+const PRODUCES: Record<SupportedType, string> = { audit: "issue", pr: "pr", review: "review" };
+
+function unsupportedOutput(type: SupportedType, output: string | undefined): string | null {
+  if (output === PRODUCES[type]) return null;
+  return `help_${type} output is ${output ?? "unset"}, and this runner produces ${PRODUCES[type]}`;
+}
 export const VERSION = `agents-contributing/${JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version}`;
 export const WORK = join(HOME, "work");
 
@@ -163,6 +170,19 @@ async function pastWithReviews(gh: GitHub, name: string, items: Issue[], login: 
   return past;
 }
 
+/**
+ * Open items have no age cutoff: a contribution that is still open after 30 days still counts,
+ * and an old labeled issue is still a task. The 30-day query adds recent closes, weekly counts
+ * and rejections. Open items are read to the last page, not capped at the recent-history limit.
+ */
+async function contributionItems(gh: GitHub, name: string, now: Date): Promise<Issue[]> {
+  const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
+  const openItems = await gh.issues(name, "state=open", Number.POSITIVE_INFINITY);
+  const recent = await gh.issues(name, `state=all&since=${since}`);
+  const seen = new Set(openItems.map((i) => i.number));
+  return [...openItems, ...recent.filter((i) => !seen.has(i.number))];
+}
+
 interface Target {
   repo: Repo;
   file: AgentsContributing;
@@ -229,8 +249,7 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
     const read = await readFile(gh, name);
     if (typeof read === "string") { skipped[name] = read; continue; }
     if (!allowedProvider(read.file, ctx.vendor, cfg.provider)) { skipped[name] = "the providers list excludes this agent"; continue; }
-    const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
-    const items = await gh.issues(name, `state=all&since=${since}`);
+    const items = await contributionItems(gh, name, now);
     const past = await pastWithReviews(gh, name, items, login, ctx.dryRun);
     targets.push({ target: { repo, file: read.file, notes: read.notes, items, past }, rejections: rejectionsOf(items, login) });
   }
@@ -256,6 +275,8 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
 
     for (const type of types) {
       const help = read.file[`${HELP_PREFIX}${type}`]!;
+      const badOutput = unsupportedOutput(type, help.output);
+      if (badOutput) { skipped[`${name} ${type}`] = badOutput; continue; }
       const paused = rejectionPause(rejections, type, now);
       if (paused) { skipped[`${name} ${type}`] = paused; continue; }
       const left = allowance(effectiveLimits(read.file, type), help.limits ?? {}, type, login, past, now);
@@ -366,23 +387,27 @@ export function loadTask(id: string): TaskState {
 
 /**
  * Re-reads the file right before submitting: the owner may have removed it, or tightened it
- * since the task was picked. Scope, providers, limits and, for a change, its rules all count.
+ * since the task was picked. Scope, output, providers, limits and, for a change, its rules all count.
+ * A string is why it must not be submitted. A number is how many contributions the limits
+ * still allow, which caps a batch of audit findings prepared under a looser allowance.
  */
-async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promise<string | null> {
+async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promise<string | number> {
   const now = await readFile(gh, t.repo);
   if (typeof now === "string") return now;
   const h = now.file[`${HELP_PREFIX}${t.type}`];
   if (!h?.enabled) return `help_${t.type} is no longer enabled`;
+  const badOutput = unsupportedOutput(t.type, h.output);
+  if (badOutput) return badOutput;
   if (h.scope !== t.scope) return `help_${t.type} changed its scope to ${h.scope}`;
   if (!allowedProvider(now.file, t.vendor, t.provider)) return "the providers list now excludes this agent";
-  const items = await gh.issues(t.repo, `state=all&since=${new Date(Date.now() - 30 * 24 * 3_600_000).toISOString()}`);
+  const items = await contributionItems(gh, t.repo, new Date());
   const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, await pastWithReviews(gh, t.repo, items, t.login, t.dryRun), new Date());
   if (left.left <= 0) return `the limits no longer allow it: ${left.reason}`;
   if (changes) {
     const errors = checkChange(changes, { forbidden: effectiveForbiddenPaths(now.file, t.type), maxDiffLines: h.max_diff_lines, require: h.require });
     if (errors.length) return `the change no longer fits the file: ${errors.join(" ")}`;
   }
-  return null;
+  return left.left;
 }
 
 async function log(gh: GitHub, cfg: ContributorConfig, t: TaskState, url: string, model: string): Promise<void> {
@@ -412,11 +437,11 @@ export async function submit(
     const known = new Set((t.openTitles ?? []).map((x) => x.trim().toLowerCase()));
     const findings = parseFindings(reply, t.max ?? 5).filter((f) => !known.has(f.title.toLowerCase()));
     if (findings.length === 0) return { ...out, submitted: [], reason: "the audit found nothing new" };
-    const why = await stillAllowed(gh, t);
-    if (why) return { ...out, aborted: why };
+    const room = await stillAllowed(gh, t);
+    if (typeof room === "string") return { ...out, aborted: room };
     const submitted: string[] = [];
     const dir = t.scope.slice(t.scope.indexOf(":") + 1);
-    for (const f of findings) {
+    for (const f of findings.slice(0, room)) {
       const body = `${f.body}\n\n---\nFound by an AI agent auditing \`${dir}\` under AGENTS-CONTRIBUTING.md.\n\n${marker}`;
       if (t.dryRun) { submitted.push(`(dry run) issue: ${f.title}`); notes.push(`Would open issue "${f.title}":\n${body}`); }
       else submitted.push((await gh.createIssue(t.repo, f.title, body)).html_url);
@@ -434,7 +459,7 @@ export async function submit(
     const errors = checkChange(changes, { forbidden: t.forbidden, maxDiffLines: t.maxDiffLines, require: t.require });
     if (errors.length) return { ...out, issue: t.issue!.number, rejected: errors };
     const why = await stillAllowed(gh, t, changes);
-    if (why) return { ...out, aborted: why };
+    if (typeof why === "string") return { ...out, aborted: why };
     const body = [
       fix.summary, `Closes #${t.issue!.number}`,
       "---\nThis pull request was written by an AI agent under this repository's AGENTS-CONTRIBUTING.md. " +
@@ -466,7 +491,7 @@ export async function submit(
 
   if (git(t.dir, "status", "--porcelain").trim()) return { ...out, rejected: ["A review must not change files."] };
   const why = await stillAllowed(gh, t);
-  if (why) return { ...out, aborted: why };
+  if (typeof why === "string") return { ...out, aborted: why };
   const body = `${parseReview(reply)}\n\n---\nReview by an AI agent under this repository's AGENTS-CONTRIBUTING.md.\n\n${marker}`;
   if (t.dryRun) {
     notes.push(`Would review #${t.pull!.number}:\n${body}`);

@@ -133,6 +133,19 @@ function pastContributions(items: Issue[], t: { repo: string; login: string; dry
   return past;
 }
 
+/**
+ * Open items have no age cutoff: a contribution that is still open after 30 days still counts,
+ * and an old labeled issue is still a task. The 30-day query adds recent closes, weekly counts
+ * and rejections. Open items are read to the last page, not capped at the recent-history limit.
+ */
+async function contributionItems(gh: GitHub, name: string, now: Date): Promise<Issue[]> {
+  const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
+  const openItems = await gh.issues(name, "state=open", Number.POSITIVE_INFINITY);
+  const recent = await gh.issues(name, `state=all&since=${since}`);
+  const seen = new Set(openItems.map((i) => i.number));
+  return [...openItems, ...recent.filter((i) => !seen.has(i.number))];
+}
+
 interface Target {
   repo: Repo;
   file: AgentsContributing;
@@ -199,8 +212,7 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
     const read = await readFile(gh, name);
     if (typeof read === "string") { skipped[name] = read; continue; }
     if (!allowedProvider(read.file, ctx.vendor, cfg.provider)) { skipped[name] = "the providers list excludes this agent"; continue; }
-    const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
-    const items = await gh.issues(name, `state=all&since=${since}`);
+    const items = await contributionItems(gh, name, now);
     const past = pastContributions(items, { repo: name, login, dryRun: ctx.dryRun });
     targets.push({ target: { repo, file: read.file, notes: read.notes, items, past }, rejections: rejectionsOf(items, login) });
   }
@@ -349,7 +361,7 @@ async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promi
   if (badOutput) return badOutput;
   if (h.scope !== t.scope) return `help_${t.type} changed its scope to ${h.scope}`;
   if (!allowedProvider(now.file, t.vendor, t.provider)) return "the providers list now excludes this agent";
-  const items = await gh.issues(t.repo, `state=all&since=${new Date(Date.now() - 30 * 24 * 3_600_000).toISOString()}`);
+  const items = await contributionItems(gh, t.repo, new Date());
   const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, pastContributions(items, t), new Date());
   if (left.left <= 0) return `the limits no longer allow it: ${left.reason}`;
   if (changes) {

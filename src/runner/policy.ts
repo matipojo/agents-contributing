@@ -66,8 +66,10 @@ export function parseNumstat(out: string): Change[] {
   for (let i = 0; i < fields.length; i++) {
     const m = /^(-|\d+)\t(-|\d+)\t([\s\S]*)$/.exec(fields[i]!.replace(/^\n/, ""));
     if (!m) continue;
-    const added = Number(m[1]) || 0;
-    const deleted = Number(m[2]) || 0;
+    // git prints "-" for binary (non-line-countable) sides; Number("-") is NaN and must
+    // not become 0, or max_diff_lines would treat the change as empty.
+    const added = m[1] === "-" ? Infinity : Number(m[1]);
+    const deleted = m[2] === "-" ? Infinity : Number(m[2]);
     if (m[3]) changes.push({ path: m[3], added, deleted });
     else {
       changes.push({ path: fields[++i] ?? "", added, deleted });
@@ -89,9 +91,18 @@ export function checkChange(
     const hit = rules.forbidden.find((f) => c.path === f || c.path.startsWith(f.endsWith("/") ? f : `${f}/`));
     if (hit) errors.push(`${c.path} is in forbidden_paths (${hit}).`);
   }
-  const lines = changes.reduce((n, c) => n + c.added + c.deleted, 0);
-  if (rules.maxDiffLines !== undefined && lines > rules.maxDiffLines) {
-    errors.push(`The change is ${lines} lines, more than max_diff_lines (${rules.maxDiffLines}).`);
+  if (rules.maxDiffLines !== undefined) {
+    const binary = changes.filter((c) => !Number.isFinite(c.added) || !Number.isFinite(c.deleted));
+    if (binary.length > 0) {
+      errors.push(
+        `Binary (non-line-countable) changes cannot satisfy max_diff_lines (${rules.maxDiffLines}): ${binary.map((c) => c.path).join(", ")}.`,
+      );
+    } else {
+      const lines = changes.reduce((n, c) => n + c.added + c.deleted, 0);
+      if (lines > rules.maxDiffLines) {
+        errors.push(`The change is ${lines} lines, more than max_diff_lines (${rules.maxDiffLines}).`);
+      }
+    }
   }
   if (rules.require?.includes("tests") && !changes.some((c) => isTest(c.path))) {
     errors.push("The help type requires tests, and no test file changed.");

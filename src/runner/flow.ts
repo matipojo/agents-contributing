@@ -333,7 +333,7 @@ export async function prepare(ctx: Context, p: Pick, replyInFile: boolean): Prom
     const diff = await ctx.gh.pullDiff(name, pull.number);
     // Running a pull request's checks runs its author's code, in an environment that holds the
     // contributor's GitHub login. Only for pull requests this contributor opened, or whose
-    // author has write access to the repository.
+    // author is the repository owner. MEMBER and COLLABORATOR do not mean write access.
     state.prompt = reviewPrompt({
       number: pull.number, title: pull.title, body: pull.body ?? "", diff, notes, replyFile: replyTarget, mayRun: mayRunPullCode(pull, ctx.login),
     });

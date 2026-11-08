@@ -420,7 +420,9 @@ test("a review runs a pull request's code only when its author is trusted", asyn
   const { mayRunPullCode } = await import("../src/runner/policy.ts");
   const { reviewPrompt } = await import("../src/runner/tasks.ts");
   assert.equal(mayRunPullCode({ user: { login: "me" }, author_association: "NONE" }, "me"), true, "this contributor's own");
-  assert.equal(mayRunPullCode({ user: { login: "maintainer" }, author_association: "MEMBER" }, "me"), true);
+  assert.equal(mayRunPullCode({ user: { login: "owner" }, author_association: "OWNER" }, "me"), true, "the repository owner");
+  assert.equal(mayRunPullCode({ user: { login: "reader" }, author_association: "MEMBER" }, "me"), false, "org membership is not write access");
+  assert.equal(mayRunPullCode({ user: { login: "reader" }, author_association: "COLLABORATOR" }, "me"), false, "an invite can be read-only");
   assert.equal(mayRunPullCode({ user: { login: "stranger" }, author_association: "CONTRIBUTOR" }, "me"), false);
   assert.equal(mayRunPullCode({ user: { login: "stranger" } }, "me"), false);
   const base = { number: 1, title: "t", body: "b", diff: "d", notes: "n" };

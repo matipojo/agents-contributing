@@ -25,6 +25,13 @@ import {
 } from "./tasks.ts";
 
 const RUNNER_TOPIC = "agents-contributing-runner";
+/** The only output this runner writes for each help type. Anything else is skipped, not published as a different kind. */
+const PRODUCES: Record<SupportedType, string> = { audit: "issue", pr: "pr", review: "review" };
+
+function unsupportedOutput(type: SupportedType, output: string | undefined): string | null {
+  if (output === PRODUCES[type]) return null;
+  return `help_${type} output is ${output ?? "unset"}, and this runner produces ${PRODUCES[type]}`;
+}
 export const VERSION = `agents-contributing/${JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version}`;
 export const WORK = join(HOME, "work");
 
@@ -126,6 +133,19 @@ function pastContributions(items: Issue[], t: { repo: string; login: string; dry
   return past;
 }
 
+/**
+ * Open items have no age cutoff: a contribution that is still open after 30 days still counts,
+ * and an old labeled issue is still a task. The 30-day query adds recent closes, weekly counts
+ * and rejections. Open items are read to the last page, not capped at the recent-history limit.
+ */
+async function contributionItems(gh: GitHub, name: string, now: Date): Promise<Issue[]> {
+  const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
+  const openItems = await gh.issues(name, "state=open", Number.POSITIVE_INFINITY);
+  const recent = await gh.issues(name, `state=all&since=${since}`);
+  const seen = new Set(openItems.map((i) => i.number));
+  return [...openItems, ...recent.filter((i) => !seen.has(i.number))];
+}
+
 interface Target {
   repo: Repo;
   file: AgentsContributing;
@@ -192,8 +212,7 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
     const read = await readFile(gh, name);
     if (typeof read === "string") { skipped[name] = read; continue; }
     if (!allowedProvider(read.file, ctx.vendor, cfg.provider)) { skipped[name] = "the providers list excludes this agent"; continue; }
-    const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
-    const items = await gh.issues(name, `state=all&since=${since}`);
+    const items = await contributionItems(gh, name, now);
     const past = pastContributions(items, { repo: name, login, dryRun: ctx.dryRun });
     targets.push({ target: { repo, file: read.file, notes: read.notes, items, past }, rejections: rejectionsOf(items, login) });
   }
@@ -219,6 +238,8 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
 
     for (const type of types) {
       const help = read.file[`${HELP_PREFIX}${type}`]!;
+      const badOutput = unsupportedOutput(type, help.output);
+      if (badOutput) { skipped[`${name} ${type}`] = badOutput; continue; }
       const paused = rejectionPause(rejections, type, now);
       if (paused) { skipped[`${name} ${type}`] = paused; continue; }
       const left = allowance(effectiveLimits(read.file, type), help.limits ?? {}, type, login, past, now);
@@ -329,7 +350,7 @@ export function loadTask(id: string): TaskState {
 
 /**
  * Re-reads the file right before submitting: the owner may have removed it, or tightened it
- * since the task was picked. Scope, providers, limits and, for a change, its rules all count.
+ * since the task was picked. Scope, output, providers, limits and, for a change, its rules all count.
  * A string is why it must not be submitted. A number is how many contributions the limits
  * still allow, which caps a batch of audit findings prepared under a looser allowance.
  */
@@ -338,9 +359,11 @@ async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promi
   if (typeof now === "string") return now;
   const h = now.file[`${HELP_PREFIX}${t.type}`];
   if (!h?.enabled) return `help_${t.type} is no longer enabled`;
+  const badOutput = unsupportedOutput(t.type, h.output);
+  if (badOutput) return badOutput;
   if (h.scope !== t.scope) return `help_${t.type} changed its scope to ${h.scope}`;
   if (!allowedProvider(now.file, t.vendor, t.provider)) return "the providers list now excludes this agent";
-  const items = await gh.issues(t.repo, `state=all&since=${new Date(Date.now() - 30 * 24 * 3_600_000).toISOString()}`);
+  const items = await contributionItems(gh, t.repo, new Date());
   const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, pastContributions(items, t), new Date());
   if (left.left <= 0) return `the limits no longer allow it: ${left.reason}`;
   if (changes) {

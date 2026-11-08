@@ -23,9 +23,9 @@ help_review:
   scope: label:agents:review-wanted
   output: review
   limits:
-    max_open_agent_contributions: 3
-    max_per_contributor_per_week: 1
-    cooldown_hours: 24
+    max_open_agent_contributions: 6
+    max_per_contributor_per_week: 6
+    cooldown_hours: 0
 help_audit:
   enabled: true
   scope: path:src/

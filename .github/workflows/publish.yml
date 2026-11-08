@@ -14,6 +14,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -22,19 +24,9 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      # A dry run never needs the token. A real publish (a v*.*.* tag, and not a
-      # manual run that asked to stay dry) stops here until the secret exists.
-      - name: Require NPM_TOKEN for a real publish
-        if: github.ref_type == 'tag' && (github.event_name != 'workflow_dispatch' || inputs.dry_run == false)
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -z "${NPM_TOKEN:-}" ]; then
-            echo "The NPM_TOKEN repository secret is empty."
-            echo "Add an npm automation token as the NPM_TOKEN repository secret (see docs/RELEASING.md)."
-            exit 1
-          fi
+      # Trusted publishing (OIDC) needs npm 11.5.1 or later; Node 22 ships an older npm.
+      - name: Install npm 11
+        run: npm install -g npm@11.21.2
 
       - run: npm ci
 
@@ -54,14 +46,28 @@ jobs:
       - run: npm run build
       - run: npm test
 
-      - name: Publish to npm
+      # A tag that is not a dry run publishes. With the NPM_TOKEN secret set the token is used;
+      # without it npm authenticates by trusted publishing (OIDC), configured on npmjs.com.
+      - name: Publish to npm (token)
+        if: env.HAS_NPM_TOKEN == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           args=(--provenance --access public)
-          # Dry when the dispatch input asks for it, and whenever this run is not a tag.
           if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${{ inputs.dry_run }}" = "true" ]; then
             args+=(--dry-run)
           fi
+          npm publish "${args[@]}"
+
+      - name: Publish to npm (trusted publishing)
+        if: env.HAS_NPM_TOKEN != 'true'
+        run: |
+          set -euo pipefail
+          args=(--provenance --access public)
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${{ inputs.dry_run }}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          # setup-node writes an .npmrc that expects a token; drop it so npm uses OIDC.
+          unset NODE_AUTH_TOKEN
           npm publish "${args[@]}"

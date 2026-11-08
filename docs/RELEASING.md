@@ -2,15 +2,21 @@
 
 The npm package is `agents-contributing`. `.github/workflows/publish.yml` publishes it when a tag `v*.*.*` is pushed, and it only packs (a dry run) otherwise.
 
-## Create the npm token
+## Authentication
 
-A real publish needs an npm **automation** token stored as the `NPM_TOKEN` repository secret. A dry run does not need the secret. The workflow reads the secret into `NODE_AUTH_TOKEN` and never prints it. If a real publish starts and the secret is empty, the job stops and points back here.
+npm revoked classic tokens on 2025-12-09 ([GitHub changelog](https://github.blog/changelog/2025-09-29-strengthening-npm-security-important-changes-to-authentication-and-token-management/)), so there is no "Automation" token any more. The workflow supports two ways to publish. A dry run needs neither.
 
-1. Sign in at [npmjs.com](https://www.npmjs.com/) and open **Access Tokens**.
-2. Generate a new token and choose **Classic Token**, then **Automation**. An automation token can publish from GitHub Actions without an interactive two-factor prompt. Copy it once; npm does not show it again.
-   Until the package exists, a granular token has to be allowed to create new packages (no single-package restriction). After the first publish, a granular token limited to `agents-contributing`, with read and write, and with two-factor authentication bypassed for CI, is enough. Keep using an automation-style token either way, so the workflow is not waiting on a person.
-3. On GitHub, open the repository **Settings → Secrets and variables → Actions → New repository secret**. Name it `NPM_TOKEN` and paste the token.
-4. Do not commit the token, do not put it in the workflow file, and do not echo it in a log.
+### 1. Trusted publishing (preferred, no secret)
+
+On npmjs.com open the package **Settings → Trusted publisher → GitHub Actions** and enter: owner `matipojo`, repository `agents-contributing`, workflow `publish.yml`. npm then accepts the short-lived OIDC identity of that workflow, so no token is stored anywhere. This needs npm 11.5.1 or later; the workflow installs a pinned npm 11. Leave the `NPM_TOKEN` secret unset and the workflow takes this path.
+
+Not confirmed: whether a package that does not exist yet can be configured this way before its first publish. If npm requires the package to exist first, do the first publish with the token below, then switch to trusted publishing.
+
+### 2. Granular token (fallback)
+
+1. On npmjs.com open **Access Tokens → Generate New Token → Granular Access Token**, with read and write on packages. Until the package exists it must be allowed to create new packages (no single-package restriction). A write token lasts at most 90 days and may require two-factor authentication, so it has to be renewed.
+2. On GitHub open **Settings → Secrets and variables → Actions → New repository secret**, name it `NPM_TOKEN`, and paste the token.
+3. Do not commit the token or echo it in a log. When the secret is set, the workflow publishes with it.
 
 ## Cut a release
 
@@ -33,7 +39,7 @@ Provenance ties the tarball to the workflow run. It is not a review of what the 
 
 ## Dry run
 
-A dry run packs the package and prints what would be uploaded. It does not publish, and it does not need `NPM_TOKEN`.
+A dry run packs the package and prints what would be uploaded. It does not publish, and it needs neither the token nor trusted publishing.
 
 From a checkout, the same pack the workflow publishes:
 
@@ -43,7 +49,7 @@ npm publish --dry-run
 
 Do the real upload from the workflow, not from a laptop.
 
-On GitHub: **Actions → Publish → Run workflow**. The `dry_run` input defaults to true. The job adds `--dry-run` when that input is true, and also whenever the run is not a tag. A real publish happens only for a `v*.*.*` tag (or a manual run of that tag with dry run turned off) and only when `NPM_TOKEN` is set.
+On GitHub: **Actions → Publish → Run workflow**. The `dry_run` input defaults to true. The job adds `--dry-run` when that input is true, and also whenever the run is not a tag. A real publish happens only for a `v*.*.*` tag (or a manual run of that tag with dry run turned off) and only when one of the two authentication methods is configured.
 
 `npm run smoke` is the local check that the tarball installs, and that `agents-contributing --version` and `agents-contributing validate` both succeed.
 

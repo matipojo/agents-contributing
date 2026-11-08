@@ -83,7 +83,7 @@ export async function setup(
 
   // Only donate what the balance check allows.
   const now = new Date();
-  const balance: Decision = decide(cfg, adapter.read(cfg, now), now, adapter.spentUsd?.() ?? null);
+  const balance: Decision = decide(cfg, await adapter.read(cfg, now), now, adapter.spentUsd?.() ?? null);
   const go = balance.verdict === "contribute" || balance.verdict === "contribute-until-limited";
   if (!go && !flags.force) {
     return { stop: { code: balance.verdict === "unknown" ? 2 : 10, result: { result: "skipped", balance, notes } } };

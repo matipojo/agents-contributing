@@ -23,7 +23,7 @@ try {
   if (!adapter) {
     throw new Error(`Unknown provider "${cfg.provider}". Known: ${Object.keys(ADAPTERS).join(", ")}.`);
   }
-  const reading = adapter.read(cfg, now);
+  const reading = await adapter.read(cfg, now);
   if (spentAt >= 0 && !(spentArg >= 0)) throw new Error("--spent-usd must be a number of 0 or more.");
   const spent = spentAt >= 0 ? spentArg : adapter.spentUsd?.() ?? null;
   const decision = decide(cfg, reading, now, spent);

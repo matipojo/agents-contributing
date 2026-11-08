@@ -44,6 +44,9 @@ with a README on how it reads usage and what a routine needs:
   windows and cloud credits, with no setup.
 - [`codex`](../../src/balance/adapters/codex/README.md): real usage windows from a
   tiny `codex exec` turn. Bought credits are never donated.
+- [`cursor`](../../src/balance/adapters/cursor/README.md): the plan's monthly usage, read from
+  Cursor with the CLI login, at no cost. The billing cycle is monthly, so it contributes only
+  in the last day of the cycle.
 - [`declared`](../../src/balance/adapters/declared/README.md): for agents that do not expose
   usage. Only the reset time is known.
 

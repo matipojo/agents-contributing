@@ -277,6 +277,56 @@ test("review: a labeled pull request this contributor opened is reviewed, once",
   assert.equal((await pick(ctx)).task, undefined, "never twice");
 });
 
+test("an audit submits only as many findings as the allowance at submit time", async () => {
+  const { submit } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { loadConfig } = await import("../src/balance/config.ts");
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  gh.file = async () => `---
+version: 1
+help_audit:
+  enabled: true
+  scope: path:src/
+  output: issue
+  limits:
+    max_open_agent_contributions: 5
+    max_per_contributor_per_week: 1
+    cooldown_hours: 0
+limits:
+  max_open_agent_contributions: 5
+  max_per_contributor_per_week: 5
+  cooldown_hours: 0
+---
+`;
+  gh.issues = async () => [];
+  const created: string[] = [];
+  gh.createIssue = async (_name, title) => {
+    created.push(title);
+    return { number: created.length, title, body: "", state: "open", user: { login: "me" }, labels: [], created_at: new Date().toISOString(), html_url: `https://example/${created.length}` };
+  };
+  const dir = mkdtempSync(join(tmpdir(), "ac-batch-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["audit"], log: false };
+  const task: import("../src/runner/flow.ts").TaskState = {
+    id: "batch", type: "audit", repo: "owner/repo", dir, baseSha: "", defaultBranch: "main",
+    pushAccess: false, scope: "path:src/", forbidden: [], require: [], max: 5, openTitles: [], prompt: "", replyFile: "",
+    runnerRepo: null, login: "me", vendor: "test", provider: "test", forced: false, dryRun: false,
+  };
+  const reply = JSON.stringify([{ title: "First", body: "One" }, { title: "Second", body: "Two" }]);
+  try {
+    const done = await submit(cfg, gh, task, reply, "test", []);
+    assert.deepEqual(created, ["First"]);
+    assert.deepEqual(done.submitted, ["https://example/1"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("issues follows every page when the caller asks for the whole set", async () => {
   const { GitHub } = await import("../src/runner/github.ts");
   const gh = new GitHub(null, "https://example.test");

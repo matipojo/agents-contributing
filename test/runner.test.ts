@@ -362,6 +362,60 @@ test("an open contribution older than 30 days still fills the cap, and an old op
   }
 });
 
+test("a help type whose output this runner cannot produce is neither selected nor submitted", async () => {
+  const { pick, submit } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { loadConfig } = await import("../src/balance/config.ts");
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const limits = "limits:\n  max_open_agent_contributions: 3\n  max_per_contributor_per_week: 1\n  cooldown_hours: 0\n";
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  let text = `---\nversion: 1\nhelp_audit:\n  enabled: true\n  scope: path:src/\n  output: comment\n${limits}---\n`;
+  gh.file = async () => text;
+  gh.issues = async () => [];
+  const created: string[] = [];
+  gh.createIssue = async (_name, title) => {
+    created.push(title);
+    return { number: 1, title, body: "", state: "open", user: { login: "me" }, labels: [], created_at: new Date().toISOString(), html_url: "https://example/issues/1" };
+  };
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["audit", "pr"], log: false };
+  const ctx = { cfg, gh, login: "me", runnerRepo: null, vendor: "test", dryRun: true, forced: false, notes: [] as string[] };
+
+  const audit = await pick(ctx);
+  assert.equal(audit.task, undefined);
+  assert.match(Object.values(audit.skipped).join(" "), /help_audit output is comment/);
+
+  text = `---\nversion: 1\nhelp_pr:\n  enabled: true\n  scope: label:agents:fix-wanted\n  output: comment\n${limits}---\n`;
+  gh.issues = async () => [{
+    number: 7, title: "Fix me", body: "", state: "open", user: { login: "someone" },
+    labels: [{ name: "agents:fix-wanted" }], created_at: new Date().toISOString(), html_url: "",
+  }];
+  const pr = await pick({ ...ctx, cfg: { ...cfg, help_types: ["pr"] } });
+  assert.equal(pr.task, undefined, "a labeled issue is still not taken when the output is not a pull request");
+  assert.match(Object.values(pr.skipped).join(" "), /help_pr output is comment/);
+
+  // Prepared while output was issue; the owner switched it to comment before submit.
+  text = `---\nversion: 1\nhelp_audit:\n  enabled: true\n  scope: path:src/\n  output: comment\n${limits}---\n`;
+  const dir = mkdtempSync(join(tmpdir(), "ac-output-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  const task: import("../src/runner/flow.ts").TaskState = {
+    id: "output-test", type: "audit", repo: "owner/repo", dir, baseSha: "", defaultBranch: "main",
+    pushAccess: false, scope: "path:src/", forbidden: [], require: [], prompt: "", replyFile: "",
+    runnerRepo: null, login: "me", vendor: "test", provider: "test", forced: false, dryRun: false,
+  };
+  const reply = JSON.stringify([{ title: "A bug", body: "Details" }, { title: "Another", body: "More" }]);
+  try {
+    const done = await submit(cfg, gh, task, reply, "test", []);
+    assert.match(String(done.aborted), /help_audit output is comment/);
+    assert.deepEqual(created, [], "submit must not publish issues when the configured output is comment");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a review runs a pull request's code only when its author is trusted", async () => {
   const { mayRunPullCode } = await import("../src/runner/policy.ts");
   const { reviewPrompt } = await import("../src/runner/tasks.ts");

@@ -1,0 +1,67 @@
+name: publish
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack and print what would be published, without uploading"
+        type: boolean
+        default: true
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      # A dry run never needs the token. A real publish (a v*.*.* tag, and not a
+      # manual run that asked to stay dry) stops here until the secret exists.
+      - name: Require NPM_TOKEN for a real publish
+        if: github.ref_type == 'tag' && (github.event_name != 'workflow_dispatch' || inputs.dry_run == false)
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NPM_TOKEN:-}" ]; then
+            echo "The NPM_TOKEN repository secret is empty."
+            echo "Add an npm automation token as the NPM_TOKEN repository secret (see docs/RELEASING.md)."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Check that the tag matches the package version
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${version}."
+            echo "The tag without the leading v must equal the version. See docs/RELEASING.md."
+            exit 1
+          fi
+
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          args=(--provenance --access public)
+          # Dry when the dispatch input asks for it, and whenever this run is not a tag.
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${{ inputs.dry_run }}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          npm publish "${args[@]}"

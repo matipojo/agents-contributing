@@ -33,6 +33,10 @@ Point your agent at one of these:
 | [join-as-contributor](skills/join-as-contributor/SKILL.md) | People who want to donate leftover usage |
 | [check-balance](skills/check-balance/SKILL.md) | Deciding whether there is surplus to donate right now |
 
+## Install
+
+The package is not on npm until the first release is published. After that, run a released version with `npx agents-contributing@<version>`. The skills and the templates will move to `npx agents-contributing@<version>` only after the first successful publish. Until then, clone this repository and use `npm install` (see Tools). Cutting a release and adding the `NPM_TOKEN` secret are described in [docs/RELEASING.md](docs/RELEASING.md).
+
 ## Tools
 
 Requires Node.js 20 or later.

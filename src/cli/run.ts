@@ -18,68 +18,95 @@
  * Writing uses the GitHub CLI's login (`gh auth login`, once), or AGENTS_CONTRIBUTING_GITHUB_TOKEN
  * when set. Without either every run is a dry run. Exit codes: 0 done, 10 nothing to do, 2 error.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG_PATH, loadConfig } from "../balance/config.ts";
 import { ADAPTERS } from "../balance/adapters/index.ts";
 import { findToken, GitHub } from "../runner/github.ts";
 import { loadTask, pick, prepare, setup, submit } from "../runner/flow.ts";
 
-const args = process.argv.slice(2);
-const take = (f: string, withValue = false): string | boolean | undefined => {
-  const i = args.indexOf(f);
-  if (i < 0) return undefined;
-  const [, value] = args.splice(i, withValue ? 2 : 1);
-  return withValue ? value : true;
-};
-const mode = args[0] === "next" || args[0] === "submit" ? args.shift()! : "launch";
-const taskId = mode === "submit" ? args.shift() : undefined;
-const force = take("--force") === true;
-const dryRunFlag = take("--dry-run") === true;
-const model = take("--model", true);
-const { token } = findToken();
-const cfg = loadConfig(args[0] ?? DEFAULT_CONFIG_PATH);
-const notes: string[] = [];
-
-function finish(code: number, result: Record<string, unknown>): never {
-  const all = [...notes, ...((result.notes as string[] | undefined) ?? [])];
-  console.log(JSON.stringify({ mode, ...result, notes: all }, null, 2));
-  process.exit(code);
+class Exit extends Error {
+  constructor(readonly code: number) {
+    super("exit");
+  }
 }
 
-async function main(): Promise<void> {
-  if (mode === "submit") {
-    if (!taskId) throw new Error("Usage: run.ts submit <task id> --model <model>");
-    const t = loadTask(taskId);
-    if (!existsSync(t.replyFile)) throw new Error(`No reply at ${t.replyFile}. Write the JSON the task asked for there first.`);
-    const gh = new GitHub(t.dryRun ? null : token);
-    if (!t.dryRun && !token) throw new Error("This task was prepared for a real run, and there is no GitHub login. Run `gh auth login` once.");
-    const done = await submit(cfg, gh, t, readFileSync(t.replyFile, "utf8"), typeof model === "string" ? model : "unknown", notes);
-    finish(done.rejected || done.aborted ? 2 : 0, { dry_run: t.dryRun, forced: t.forced, ...done });
+export function main(argv: string[]): Promise<number> {
+  const args = [...argv];
+  const take = (f: string, withValue = false): string | boolean | undefined => {
+    const i = args.indexOf(f);
+    if (i < 0) return undefined;
+    const [, value] = args.splice(i, withValue ? 2 : 1);
+    return withValue ? value : true;
+  };
+  const mode = args[0] === "next" || args[0] === "submit" ? args.shift()! : "launch";
+  const taskId = mode === "submit" ? args.shift() : undefined;
+  const force = take("--force") === true;
+  const dryRunFlag = take("--dry-run") === true;
+  const model = take("--model", true);
+  const { token } = findToken();
+  const cfg = loadConfig(args[0] ?? DEFAULT_CONFIG_PATH);
+  const notes: string[] = [];
+
+  function finish(code: number, result: Record<string, unknown>): never {
+    const all = [...notes, ...((result.notes as string[] | undefined) ?? [])];
+    console.log(JSON.stringify({ mode, ...result, notes: all }, null, 2));
+    throw new Exit(code);
   }
 
-  const ready = await setup(cfg, token, { dryRun: dryRunFlag, force });
-  if (ready.stop) finish(ready.stop.code, ready.stop.result);
-  const ctx = ready.ctx!;
-  notes.push(...ctx.notes);
-  ctx.notes = notes;
-  const found = await pick(ctx);
-  if (!found.task) finish(10, { result: "nothing-to-do", skipped: found.skipped });
+  return (async () => {
+    if (mode === "submit") {
+      if (!taskId) throw new Error("Usage: run.ts submit <task id> --model <model>");
+      const t = loadTask(taskId);
+      if (!existsSync(t.replyFile)) throw new Error(`No reply at ${t.replyFile}. Write the JSON the task asked for there first.`);
+      const gh = new GitHub(t.dryRun ? null : token);
+      if (!t.dryRun && !token) throw new Error("This task was prepared for a real run, and there is no GitHub login. Run `gh auth login` once.");
+      const done = await submit(cfg, gh, t, readFileSync(t.replyFile, "utf8"), typeof model === "string" ? model : "unknown", notes);
+      finish(done.rejected || done.aborted ? 2 : 0, { dry_run: t.dryRun, forced: t.forced, ...done });
+    }
 
-  if (mode === "next") {
-    const t = await prepare(ctx, found.task, true);
-    finish(0, {
-      result: "task", dry_run: t.dryRun, forced: t.forced, task: t.id, type: t.type, repo: t.repo, dir: t.dir,
-      instructions: `Work in ${t.dir}. ${t.prompt}`,
-      then: `run.ts submit ${t.id} --model <the model you are>`,
-    });
-  }
+    const ready = await setup(cfg, token, { dryRun: dryRunFlag, force });
+    if (ready.stop) finish(ready.stop.code, ready.stop.result);
+    const ctx = ready.ctx!;
+    notes.push(...ctx.notes);
+    ctx.notes = notes;
+    const found = await pick(ctx);
+    if (!found.task) finish(10, { result: "nothing-to-do", skipped: found.skipped });
 
-  const agent = ADAPTERS[cfg.provider]?.agent;
-  if (!agent) throw new Error(`The "${cfg.provider}" provider cannot be launched by the runner. Use "run.ts next" from the agent instead.`);
-  const t = await prepare(ctx, found.task, false);
-  const res = agent.run({ cwd: t.dir, prompt: t.prompt, write: t.type === "pr" });
-  const done = await submit(cfg, ctx.gh, t, res.text, res.model, notes);
-  finish(done.rejected || done.aborted ? 2 : 0, { dry_run: t.dryRun, forced: t.forced, balance_forced: force, ...done });
+    if (mode === "next") {
+      const t = await prepare(ctx, found.task, true);
+      finish(0, {
+        result: "task", dry_run: t.dryRun, forced: t.forced, task: t.id, type: t.type, repo: t.repo, dir: t.dir,
+        instructions: `Work in ${t.dir}. ${t.prompt}`,
+        then: `run.ts submit ${t.id} --model <the model you are>`,
+      });
+    }
+
+    const agent = ADAPTERS[cfg.provider]?.agent;
+    if (!agent) throw new Error(`The "${cfg.provider}" provider cannot be launched by the runner. Use "run.ts next" from the agent instead.`);
+    const t = await prepare(ctx, found.task, false);
+    const res = agent.run({ cwd: t.dir, prompt: t.prompt, write: t.type === "pr" });
+    const done = await submit(cfg, ctx.gh, t, res.text, res.model, notes);
+    finish(done.rejected || done.aborted ? 2 : 0, { dry_run: t.dryRun, forced: t.forced, balance_forced: force, ...done });
+  })().catch((e: unknown) => {
+    if (e instanceof Exit) return e.code;
+    const all = [...notes];
+    console.log(JSON.stringify({ mode, result: "error", reason: (e as Error).message, notes: all }, null, 2));
+    return 2;
+  });
 }
 
-main().catch((e) => finish(2, { result: "error", reason: (e as Error).message }));
+/** True when this file is the one node or tsx was started with, including via a symlink. */
+function invokedDirectly(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) {
+  main(process.argv.slice(2)).then((code) => process.exit(code));
+}

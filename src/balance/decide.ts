@@ -25,12 +25,14 @@ export function decide(cfg: ContributorConfig, reading: UsageReading, now: Date,
   const b = cfg.budget;
   // What the request is charged to decides first: without it, the windows are not in play.
   if (reading.billing) return decideBilling(cfg, reading.billing, now, spentUsd);
-  const win = reading.windows.find((w) => w.name === b.window);
+  // The config's window, else the provider's own, else the weekly one most providers have.
+  const windowName = b.window || reading.primaryWindow || "seven_day";
+  const win = reading.windows.find((w) => w.name === windowName);
   if (!win) {
     return {
       verdict: "unknown",
-      reason: `The provider reported no "${b.window}" window. Available: ${reading.windows.map((w) => w.name).join(", ")}.`,
-      window: b.window, hours_to_reset: NaN, used_pct: null, surplus_pct: null,
+      reason: `The provider reported no "${windowName}" window. Available: ${reading.windows.map((w) => w.name).join(", ")}.`,
+      window: windowName, hours_to_reset: NaN, used_pct: null, surplus_pct: null,
       donate_pct: null, stop_at_used_pct: null, resets_at: "",
     };
   }

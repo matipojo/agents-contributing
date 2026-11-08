@@ -23,6 +23,8 @@ export interface UsageReading {
   source: string;           // where the numbers came from
   capturedAt: Date;
   windows: UsageWindow[];
+  /** The window the surplus is measured on when the config does not name one. Default: seven_day. */
+  primaryWindow?: string;
   billing?: Billing;        // absent when requests count against the windows
 }
 
@@ -69,8 +71,11 @@ export interface Adapter {
    * set; the nearest of these in the process tree is the agent actually calling the runner.
    */
   processNames?: string[];
-  /** The usage windows, and `billing` when requests are charged to something else. */
-  read(cfg: ContributorConfig, now: Date): UsageReading;
+  /**
+   * The usage windows, and `billing` when requests are charged to something else. May be
+   * asynchronous, for a provider that reports usage over the network.
+   */
+  read(cfg: ContributorConfig, now: Date): UsageReading | Promise<UsageReading>;
   /** What the current run has spent so far, if the provider can tell. Caps credit pools. */
   spentUsd?(): number | null;
   /** How to launch the agent, for GitHub Actions and cron. Routines do not need it. */

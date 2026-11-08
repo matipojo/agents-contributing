@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import type { Adapter } from "../types.ts";
 import { claudeCode } from "./claude-code/adapter.ts";
 import { codex } from "./codex/adapter.ts";
+import { cursor } from "./cursor/adapter.ts";
 import { declared } from "./declared/adapter.ts";
 
 /**
@@ -12,6 +13,7 @@ import { declared } from "./declared/adapter.ts";
 export const ADAPTERS: Record<string, Adapter> = {
   [claudeCode.name]: claudeCode,
   [codex.name]: codex,
+  [cursor.name]: cursor,
   [declared.name]: declared,
 };
 

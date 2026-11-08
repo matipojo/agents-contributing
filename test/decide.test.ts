@@ -130,3 +130,15 @@ test("billing is decided even without the subscription window", () => {
   const r = { ...credits(60), windows: [] };
   assert.equal(decide(cfg, r, now, 0).verdict, "contribute-until-limited");
 });
+
+test("the provider's own window is used when the config names none, and the config wins when it does", () => {
+  const monthly: UsageReading = {
+    provider: "test", source: "test", capturedAt: now, primaryWindow: "monthly",
+    windows: [{ name: "monthly", usedPct: 20, resetsAt: hours(10) }, { name: "seven_day", usedPct: 40, resetsAt: hours(10) }],
+  };
+  const own = decide({ ...cfg, budget: { ...cfg.budget, window: "" } }, monthly, now);
+  assert.equal(own.window, "monthly");
+  assert.equal(own.verdict, "contribute");
+  assert.equal(decide(cfg, monthly, now).window, "seven_day", "an explicit window in the config wins");
+  assert.equal(decide({ ...cfg, budget: { ...cfg.budget, window: "" } }, { ...monthly, primaryWindow: undefined }, now).window, "seven_day");
+});

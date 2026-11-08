@@ -61,6 +61,7 @@ npm test
 |---|---|
 | `claude-code` | Real usage and reset times from a tiny headless `claude -p` request. Works in scheduled routines |
 | `codex` | Real usage and reset times from a tiny `codex exec` turn and its session file |
+| `cursor` | The plan's current monthly period, read from Cursor's dashboard service with the CLI login. No agent turn |
 | `declared` | No usage, only a declared weekly reset time. Contributes until the provider refuses |
 
 Each adapter has its own folder under `src/balance/adapters/`, with its code, tests and README.

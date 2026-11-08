@@ -10,7 +10,7 @@ export interface ContributorConfig {
   targets: { repos: string[]; topics: string[] };
   help_types: string[];
   budget: {
-    window: string;
+    window: string;         // "" means the provider's own (seven_day for most, monthly for Cursor)
     lead_hours: number;
     margin_pct: number;
     donate_fraction: number;
@@ -37,7 +37,7 @@ const DEFAULTS: ContributorConfig = {
   provider: "declared",
   targets: { repos: [], topics: ["agents-contributing"] },
   help_types: ["audit", "pr", "review", "reproduce", "triage", "tests", "docs"],
-  budget: { window: "seven_day", lead_hours: 24, margin_pct: 10, donate_fraction: 1, min_surplus_pct: 5 },
+  budget: { window: "", lead_hours: 24, margin_pct: 10, donate_fraction: 1, min_surplus_pct: 5 },
   donate: ["subscription", "credits"],
   credits: { lead_days: 3, daily_usd: 15, remind_days: 7 },
   declared: { timezone: "UTC", weekly_reset: "sun 00:00" },

@@ -44,7 +44,7 @@ export const declared: Adapter = {
       provider: "declared",
       source: "contributor.yml",
       capturedAt: now,
-      windows: [{ name: cfg.budget.window, usedPct: null, resetsAt }],
+      windows: [{ name: cfg.budget.window || "seven_day", usedPct: null, resetsAt }],
     };
   },
 };

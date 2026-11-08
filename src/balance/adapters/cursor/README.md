@@ -22,8 +22,8 @@ that reset together at the end of the billing cycle:
 
 | Window | Cursor shows it when | Message in the answer |
 |---|---|---|
-| `monthly` (the default) | Auto is selected | "You've used 9% of your included total usage" |
-| `monthly_api` | a named model is selected | "You've used 61% of your included API usage" |
+| `monthly` (the default) | Auto is selected | "You've used N% of your included total usage" |
+| `monthly_api` | a named model is selected | "You've used N% of your included API usage" |
 
 The surplus is measured on `monthly`. If `monthly_api` is nearly full, the check waits, like
 any other nearly full window. The billing cycle is monthly, so with the default `lead_hours: 24`

@@ -7,21 +7,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { authFile, cursorToken, parsePeriodUsage, cursor } from "./adapter.ts";
 
-// The shape of a real GetCurrentPeriodUsage answer (Pro plan), trimmed to what is read.
+// The shape of a real GetCurrentPeriodUsage answer, trimmed to what is read, with made-up values.
 const SAMPLE = {
-  billingCycleStart: "1791570720000",
-  billingCycleEnd: "1794249120000",
-  planUsage: { totalSpend: 4272, includedSpend: 2000, bonusSpend: 2272, limit: 2000, autoPercentUsed: 6.466666666666667, apiPercentUsed: 60.53333333333333, totalPercentUsed: 9.041269841269841 },
-  displayMessage: "You've used 50% of your included usage",
-  autoModelSelectedDisplayMessage: "You've used 9% of your included total usage",
-  namedModelSelectedDisplayMessage: "You've used 61% of your included API usage",
+  billingCycleStart: "1700000000000",
+  billingCycleEnd: "1702592000000",
+  planUsage: { totalSpend: 1000, includedSpend: 1000, bonusSpend: 0, limit: 1000, autoPercentUsed: 10, apiPercentUsed: 40.06, totalPercentUsed: 25.04 },
+  displayMessage: "You've used N% of your included usage",
+  autoModelSelectedDisplayMessage: "You've used N% of your included total usage",
+  namedModelSelectedDisplayMessage: "You've used N% of your included API usage",
 };
 
 test("parsePeriodUsage reads the total and the API figure, with the cycle end as the reset", () => {
   const w = parsePeriodUsage(SAMPLE);
   assert.deepEqual(w.map((x) => [x.name, x.usedPct, x.resetsAt.toISOString()]), [
-    ["monthly", 9, "2026-11-09T18:32:00.000Z"],
-    ["monthly_api", 60.5, "2026-11-09T18:32:00.000Z"],
+    ["monthly", 25, "2023-12-14T22:13:20.000Z"],
+    ["monthly_api", 40.1, "2023-12-14T22:13:20.000Z"],
   ]);
 });
 
@@ -89,9 +89,9 @@ test("check-balance reads Cursor's usage over the network, and decides on the mo
   assert.deepEqual(seen, { path: "/aiserver.v1.DashboardService/GetCurrentPeriodUsage", auth: "Bearer test-token", connect: "1", body: "{}", method: "POST" });
   assert.equal(out.provider, "cursor");
   assert.equal(out.window, "monthly");
-  assert.equal(out.used_pct, 9);
+  assert.equal(out.used_pct, 25);
   assert.equal(out.verdict, "contribute");
-  assert.equal(out.donate_pct, 81);
+  assert.equal(out.donate_pct, 65);
   assert.equal(out.stop_at_used_pct, 90);
 });
 

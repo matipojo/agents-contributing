@@ -330,8 +330,10 @@ export function loadTask(id: string): TaskState {
 /**
  * Re-reads the file right before submitting: the owner may have removed it, or tightened it
  * since the task was picked. Scope, providers, limits and, for a change, its rules all count.
+ * A string is why it must not be submitted. A number is how many contributions the limits
+ * still allow, which caps a batch of audit findings prepared under a looser allowance.
  */
-async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promise<string | null> {
+async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promise<string | number> {
   const now = await readFile(gh, t.repo);
   if (typeof now === "string") return now;
   const h = now.file[`${HELP_PREFIX}${t.type}`];
@@ -345,7 +347,7 @@ async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promi
     const errors = checkChange(changes, { forbidden: effectiveForbiddenPaths(now.file, t.type), maxDiffLines: h.max_diff_lines, require: h.require });
     if (errors.length) return `the change no longer fits the file: ${errors.join(" ")}`;
   }
-  return null;
+  return left.left;
 }
 
 async function log(gh: GitHub, cfg: ContributorConfig, t: TaskState, url: string, model: string): Promise<void> {
@@ -375,11 +377,11 @@ export async function submit(
     const known = new Set((t.openTitles ?? []).map((x) => x.trim().toLowerCase()));
     const findings = parseFindings(reply, t.max ?? 5).filter((f) => !known.has(f.title.toLowerCase()));
     if (findings.length === 0) return { ...out, submitted: [], reason: "the audit found nothing new" };
-    const why = await stillAllowed(gh, t);
-    if (why) return { ...out, aborted: why };
+    const room = await stillAllowed(gh, t);
+    if (typeof room === "string") return { ...out, aborted: room };
     const submitted: string[] = [];
     const dir = t.scope.slice(t.scope.indexOf(":") + 1);
-    for (const f of findings) {
+    for (const f of findings.slice(0, room)) {
       const body = `${f.body}\n\n---\nFound by an AI agent auditing \`${dir}\` under AGENTS-CONTRIBUTING.md.\n\n${marker}`;
       if (t.dryRun) { submitted.push(`(dry run) issue: ${f.title}`); notes.push(`Would open issue "${f.title}":\n${body}`); }
       else submitted.push((await gh.createIssue(t.repo, f.title, body)).html_url);
@@ -397,7 +399,7 @@ export async function submit(
     const errors = checkChange(changes, { forbidden: t.forbidden, maxDiffLines: t.maxDiffLines, require: t.require });
     if (errors.length) return { ...out, issue: t.issue!.number, rejected: errors };
     const why = await stillAllowed(gh, t, changes);
-    if (why) return { ...out, aborted: why };
+    if (typeof why === "string") return { ...out, aborted: why };
     const body = [
       fix.summary, `Closes #${t.issue!.number}`,
       "---\nThis pull request was written by an AI agent under this repository's AGENTS-CONTRIBUTING.md. " +
@@ -429,7 +431,7 @@ export async function submit(
 
   if (git(t.dir, "status", "--porcelain").trim()) return { ...out, rejected: ["A review must not change files."] };
   const why = await stillAllowed(gh, t);
-  if (why) return { ...out, aborted: why };
+  if (typeof why === "string") return { ...out, aborted: why };
   const body = `${parseReview(reply)}\n\n---\nReview by an AI agent under this repository's AGENTS-CONTRIBUTING.md.\n\n${marker}`;
   if (t.dryRun) {
     notes.push(`Would review #${t.pull!.number}:\n${body}`);

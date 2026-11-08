@@ -7,8 +7,8 @@ help_pr:
   require: [tests, disclosure]
   max_diff_lines: 300
   limits:
-    max_open_agent_contributions: 6
-    max_per_contributor_per_week: 6
+    max_open_agent_contributions: 100
+    max_per_contributor_per_week: 100
     cooldown_hours: 0
 help_triage:
   enabled: false
@@ -23,21 +23,21 @@ help_review:
   scope: label:agents:review-wanted
   output: review
   limits:
-    max_open_agent_contributions: 6
-    max_per_contributor_per_week: 6
+    max_open_agent_contributions: 100
+    max_per_contributor_per_week: 100
     cooldown_hours: 0
 help_audit:
   enabled: true
   scope: path:src/
   output: issue
   limits:
-    max_open_agent_contributions: 5
-    max_per_contributor_per_week: 5
+    max_open_agent_contributions: 100
+    max_per_contributor_per_week: 100
     cooldown_hours: 0
 limits:
-  max_open_agent_contributions: 3
-  max_per_contributor_per_week: 1
-  cooldown_hours: 24
+  max_open_agent_contributions: 100
+  max_per_contributor_per_week: 100
+  cooldown_hours: 0
 forbidden_paths: [.github/, package.json, package-lock.json]
 contact: "@matipojo"
 ---

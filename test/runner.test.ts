@@ -63,6 +63,15 @@ test("checkChange: no change is not a contribution", () => {
   assert.match(checkChange([], { forbidden: [] }).join(" "), /no files/);
 });
 
+test("checkChange: binary numstat (-) cannot bypass max_diff_lines", () => {
+  const changes = parseNumstat("-\t-\tblob.bin\x00");
+  assert.deepEqual(changes, [{ path: "blob.bin", added: Infinity, deleted: Infinity }]);
+  assert.match(checkChange(changes, { forbidden: [], maxDiffLines: 1 }).join(" "), /Binary|max_diff_lines/);
+  assert.match(checkChange(changes, { forbidden: [], maxDiffLines: 0 }).join(" "), /Binary|max_diff_lines/);
+  // Without a size limit, binary is still a change (forbidden paths still apply).
+  assert.deepEqual(checkChange(changes, { forbidden: [] }), []);
+});
+
 test("extractJson finds JSON inside prose or a code fence", () => {
   assert.deepEqual(extractJson('Here:\n```json\n[{"a":1}]\n```\nDone.'), [{ a: 1 }]);
   assert.deepEqual(extractJson('Result {"title":"x","summary":"y"} end'), { title: "x", summary: "y" });

@@ -24,7 +24,7 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      # Trusted publishing (OIDC) needs npm 11.5.1 or later; Node 22 ships an older npm.
+      # Trusted publishing requires npm >= 11.5.1.
       - name: Install npm 11
         run: npm install -g npm@11.21.2
 
@@ -46,8 +46,6 @@ jobs:
       - run: npm run build
       - run: npm test
 
-      # A tag that is not a dry run publishes. With the NPM_TOKEN secret set the token is used;
-      # without it npm authenticates by trusted publishing (OIDC), configured on npmjs.com.
       - name: Publish to npm (token)
         if: env.HAS_NPM_TOKEN == 'true'
         env:
@@ -68,6 +66,6 @@ jobs:
           if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${{ inputs.dry_run }}" = "true" ]; then
             args+=(--dry-run)
           fi
-          # setup-node writes an .npmrc that expects a token; drop it so npm uses OIDC.
+          # setup-node writes an .npmrc that requires a token. Unset it so npm uses OIDC.
           unset NODE_AUTH_TOKEN
           npm publish "${args[@]}"

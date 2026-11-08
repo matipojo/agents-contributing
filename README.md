@@ -35,7 +35,11 @@ Point your agent at one of these:
 
 ## Install
 
-The package is not on npm until the first release is published. After that, run a released version with `npx agents-contributing@<version>`. The skills and the templates will move to `npx agents-contributing@<version>` only after the first successful publish. Until then, clone this repository and use `npm install` (see Tools). Cutting a release and adding the `NPM_TOKEN` secret are described in [docs/RELEASING.md](docs/RELEASING.md).
+`agents-contributing` is not on npm yet. Clone this repository and run `npm install` (see Tools).
+
+After it is published, run `npx agents-contributing@<version>`.
+
+To publish, follow [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Tools
 

@@ -1,58 +1,76 @@
 # Releasing
 
-The npm package is `agents-contributing`. `.github/workflows/publish.yml` publishes it when a tag `v*.*.*` is pushed, and it only packs (a dry run) otherwise.
+Package: `agents-contributing`.
 
-## Authentication
+`.github/workflows/publish.yml` (workflow name `publish`) runs on a push of a tag `v*.*.*`, and from **Actions → publish → Run workflow**.
 
-npm revoked classic tokens on 2025-12-09 ([GitHub changelog](https://github.blog/changelog/2025-09-29-strengthening-npm-security-important-changes-to-authentication-and-token-management/)), so there is no "Automation" token any more. The workflow supports two ways to publish. A dry run needs neither.
+The job adds `--dry-run` unless the ref is a tag and `dry_run` is not `true`. A tag push has no `dry_run` input, so it publishes. The manual `dry_run` input defaults to `true`. A dry run needs no npm credentials.
 
-### 1. Trusted publishing (preferred, no secret)
+Workflow permissions: `contents: read`, `id-token: write`. `id-token: write` is required for trusted publishing and for `--provenance`.
 
-On npmjs.com open the package **Settings → Trusted publisher → GitHub Actions** and enter: owner `matipojo`, repository `agents-contributing`, workflow `publish.yml`. npm then accepts the short-lived OIDC identity of that workflow, so no token is stored anywhere. This needs npm 11.5.1 or later; the workflow installs a pinned npm 11. Leave the `NPM_TOKEN` secret unset and the workflow takes this path.
+## Trusted publishing
 
-Not confirmed: whether a package that does not exist yet can be configured this way before its first publish. If npm requires the package to exist first, do the first publish with the token below, then switch to trusted publishing.
+On npmjs.com open the package **Settings → Trusted publisher → GitHub Actions** and set:
 
-### 2. Granular token (fallback)
+- owner: `matipojo`
+- repository: `agents-contributing`
+- workflow: `publish.yml`
 
-1. On npmjs.com open **Access Tokens → Generate New Token → Granular Access Token**, with read and write on packages. Until the package exists it must be allowed to create new packages (no single-package restriction). A write token lasts at most 90 days and may require two-factor authentication, so it has to be renewed.
-2. On GitHub open **Settings → Secrets and variables → Actions → New repository secret**, name it `NPM_TOKEN`, and paste the token.
-3. Do not commit the token or echo it in a log. When the secret is set, the workflow publishes with it.
+Leave the Actions secret `NPM_TOKEN` unset. The workflow then publishes with GitHub OIDC.
+
+Trusted publishing requires npm 11.5.1 or later. The workflow installs npm 11.21.2.
+
+If npm refuses trusted publishing for a package that does not exist yet, publish the first version with an `NPM_TOKEN` secret (a granular token with permission to create packages). Then add the trusted publisher above and delete the `NPM_TOKEN` secret.
+
+## Granular token
+
+1. On npmjs.com open **Access Tokens → Generate New Token → Granular Access Token**. Grant read and write on packages. For a package that does not exist yet, allow creating new packages and do not limit the token to one package.
+2. On GitHub open **Settings → Secrets and variables → Actions → New repository secret**. Name: `NPM_TOKEN`. Value: the token.
+3. Store the token only in the `NPM_TOKEN` secret. While that secret is set, the workflow publishes with it.
+
+A write token expires within 90 days. Generate a new token and update the `NPM_TOKEN` secret before it expires.
 
 ## Cut a release
 
-Start from a clean `main`, after `npm test` and `npm run smoke` have passed.
+From a clean `main`, after `npm test` and `npm run smoke` pass:
 
 ```bash
-npm version patch   # or minor, or major, or an explicit x.y.z
+npm version patch   # or minor, or major, or x.y.z
 git push origin main --follow-tags
 ```
 
-`npm version` bumps `package.json` and `package-lock.json`, commits that change, and creates a tag `vX.Y.Z`. The tag without the leading `v` has to equal the `version` field. The workflow checks that and fails if they differ.
+`npm version` updates `package.json` and `package-lock.json`, commits, and creates tag `vX.Y.Z`. The tag with the leading `v` removed must equal the `version` field.
 
-Pushing the tag runs the publish workflow: it typechecks, builds, tests, and runs `npm publish --provenance --access public`.
+If they differ, the workflow prints this and exits 1:
 
-## What provenance gives
+```text
+Tag <tag> does not match package.json version <version>.
+The tag without the leading v must equal the version. See docs/RELEASING.md.
+```
 
-`--provenance` attaches a signed statement to the package on npm. The statement names the repository, the commit, and the GitHub Actions workflow that built the tarball, so anyone can check that the files on npm came from this repository and were not replaced later. The workflow sets `id-token: write` so GitHub can issue the short-lived token that signs the statement. `publishConfig.provenance` is `true` as well, so a publish of this package asks for provenance even if the flag is left off the command.
+Delete the bad tag and push a tag named `v` plus the `version` in `package.json`:
 
-Provenance ties the tarball to the workflow run. It is not a review of what the code does.
+```bash
+git tag -d BAD_TAG
+git push origin :refs/tags/BAD_TAG
+git tag "v$(node -p "require('./package.json').version")"
+git push origin "v$(node -p "require('./package.json').version")"
+```
+
+The job then runs `npm run typecheck`, `npm run build`, `npm test`, and `npm publish --provenance --access public`.
+
+`package.json` sets `publishConfig.access` to `public` and `publishConfig.provenance` to `true`.
+
+Publish from this workflow.
 
 ## Dry run
 
-A dry run packs the package and prints what would be uploaded. It does not publish, and it needs neither the token nor trusted publishing.
-
-From a checkout, the same pack the workflow publishes:
+From a checkout:
 
 ```bash
 npm publish --dry-run
 ```
 
-Do the real upload from the workflow, not from a laptop.
+On GitHub: **Actions → publish → Run workflow**.
 
-On GitHub: **Actions → Publish → Run workflow**. The `dry_run` input defaults to true. The job adds `--dry-run` when that input is true, and also whenever the run is not a tag. A real publish happens only for a `v*.*.*` tag (or a manual run of that tag with dry run turned off) and only when one of the two authentication methods is configured.
-
-`npm run smoke` is the local check that the tarball installs, and that `agents-contributing --version` and `agents-contributing validate` both succeed.
-
-## After the first publish
-
-The skills and the templates will move to `npx agents-contributing@<version>` only after the first successful publish. Until that release is on npm, they keep cloning this repository.
+`npm run smoke` installs the packed tarball in an empty directory, then runs `agents-contributing --version` and `agents-contributing validate` on a copy of `templates/AGENTS-CONTRIBUTING.md`. `--version` must print the `version` from `package.json`.

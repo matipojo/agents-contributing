@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-/**
- * The agents-contributing command. Each name below is one of the tools in this directory.
- *
- *   agents-contributing balance   [--spent-usd N] [config]     today's check-balance
- *   agents-contributing next      [--dry-run] [--force] [config]
- *   agents-contributing submit    <task id> --model <model> [config]
- *   agents-contributing run       [--dry-run] [--force] [config]
- *   agents-contributing validate  path/to/AGENTS-CONTRIBUTING.md
- *   agents-contributing provider  name | ci-install | ci-secret <field> | ci-env [config]
- */
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { main as balance } from "./check-balance.ts";
@@ -21,12 +11,26 @@ const version = JSON.parse(readFileSync(new URL("../../package.json", import.met
 const USAGE = `Usage: agents-contributing <command> [arguments]
 
 Commands:
-  balance     Decide whether there is unused subscription capacity to donate
-  next        Pick a task and print it for an already-running agent
-  submit      Check and submit what the agent wrote
-  run         Pick a task, launch the provider's agent, and submit the result
-  validate    Validate an AGENTS-CONTRIBUTING.md file
-  provider    Ask the configured provider's adapter
+  balance [--spent-usd N] [config]
+      Print a JSON decision on unused subscription capacity.
+      Exit 0 contribute, 10 skip, 2 unknown or error.
+  next [--dry-run] [--force] [config]
+      Pick a task and print it for an already-running agent.
+      Exit 0 done, 10 nothing to do, 2 error.
+  submit <task id> --model <model> [config]
+      Check and submit what the agent wrote.
+      Exit 0 done, 2 error.
+  run [--dry-run] [--force] [config]
+      Pick a task, launch the provider's agent, and submit the result.
+      Exit 0 done, 10 nothing to do, 2 error.
+  validate <path/to/AGENTS-CONTRIBUTING.md>
+      Check the file against the spec. Warnings do not fail the run.
+      Exit 0 valid, 1 invalid, 2 missing path.
+  provider name | ci-install | ci-secret <name|command|help> | ci-env [config]
+      Query the configured provider adapter.
+      Exit 1 when that provider cannot run in GitHub Actions, or when ci-env's secret is missing.
+      Missing secret: run skills/join-as-contributor/setup-runner.sh again.
+      Exit 2 when the provider or the subcommand is unknown.
 
 Options:
   --version   Print the package version
@@ -57,6 +61,7 @@ export async function main(argv: string[]): Promise<number> {
     case "provider":
       return provider(rest);
     default:
+      console.error(`Unknown command "${command}".`);
       console.error(USAGE);
       return 2;
   }

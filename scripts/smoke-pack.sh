@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Pack the package, install that tarball somewhere empty, and run the two commands
-# a fresh install has to survive: --version, and validate on a copy of the template.
+# Install the packed tarball in an empty directory. `agents-contributing --version` must
+# match package.json. `agents-contributing validate` must accept templates/AGENTS-CONTRIBUTING.md.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -9,7 +9,7 @@ cd "$root"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-# prepack builds dist/ before the tarball is written. --silent still prints the name.
+# prepack writes dist/ before the tarball. `npm pack --silent` still prints the filename.
 tarball=$(npm pack --silent --pack-destination "$work")
 if [[ "$tarball" != /* ]]; then
   tarball="$work/$tarball"

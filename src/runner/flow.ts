@@ -25,6 +25,13 @@ import {
 } from "./tasks.ts";
 
 const RUNNER_TOPIC = "agents-contributing-runner";
+/** The only output this runner writes for each help type. Anything else is skipped, not published as a different kind. */
+const PRODUCES: Record<SupportedType, string> = { audit: "issue", pr: "pr", review: "review" };
+
+function unsupportedOutput(type: SupportedType, output: string | undefined): string | null {
+  if (output === PRODUCES[type]) return null;
+  return `help_${type} output is ${output ?? "unset"}, and this runner produces ${PRODUCES[type]}`;
+}
 export const VERSION = `agents-contributing/${JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version}`;
 export const WORK = join(HOME, "work");
 
@@ -219,6 +226,8 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
 
     for (const type of types) {
       const help = read.file[`${HELP_PREFIX}${type}`]!;
+      const badOutput = unsupportedOutput(type, help.output);
+      if (badOutput) { skipped[`${name} ${type}`] = badOutput; continue; }
       const paused = rejectionPause(rejections, type, now);
       if (paused) { skipped[`${name} ${type}`] = paused; continue; }
       const left = allowance(effectiveLimits(read.file, type), help.limits ?? {}, type, login, past, now);
@@ -329,13 +338,15 @@ export function loadTask(id: string): TaskState {
 
 /**
  * Re-reads the file right before submitting: the owner may have removed it, or tightened it
- * since the task was picked. Scope, providers, limits and, for a change, its rules all count.
+ * since the task was picked. Scope, output, providers, limits and, for a change, its rules all count.
  */
 async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promise<string | null> {
   const now = await readFile(gh, t.repo);
   if (typeof now === "string") return now;
   const h = now.file[`${HELP_PREFIX}${t.type}`];
   if (!h?.enabled) return `help_${t.type} is no longer enabled`;
+  const badOutput = unsupportedOutput(t.type, h.output);
+  if (badOutput) return badOutput;
   if (h.scope !== t.scope) return `help_${t.type} changed its scope to ${h.scope}`;
   if (!allowedProvider(now.file, t.vendor, t.provider)) return "the providers list now excludes this agent";
   const items = await gh.issues(t.repo, `state=all&since=${new Date(Date.now() - 30 * 24 * 3_600_000).toISOString()}`);

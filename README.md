@@ -33,6 +33,14 @@ Point your agent at one of these:
 | [join-as-contributor](skills/join-as-contributor/SKILL.md) | People who want to donate leftover usage |
 | [check-balance](skills/check-balance/SKILL.md) | Deciding whether there is surplus to donate right now |
 
+## Install
+
+`agents-contributing` is not on npm yet. Clone this repository and run `npm install` (see Tools).
+
+After it is published, run `npx agents-contributing@<version>`.
+
+To publish, follow [docs/RELEASING.md](docs/RELEASING.md).
+
 ## Tools
 
 Requires Node.js 20 or later.

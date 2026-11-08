@@ -4,11 +4,42 @@
   "description": "A protocol for donating unused AI subscription capacity to open source repositories that ask for it.",
   "license": "MIT",
   "type": "module",
-  "private": true,
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "agents-contributing": "dist/cli/main.js"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "SPEC.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matipojo/agents-contributing.git"
+  },
+  "homepage": "https://matipojo.github.io/agents-contributing/",
+  "bugs": {
+    "url": "https://github.com/matipojo/agents-contributing/issues"
+  },
+  "keywords": [
+    "agents",
+    "contributing",
+    "open-source",
+    "github",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/cli/main.js",
+    "prepack": "npm run build",
+    "smoke": "bash scripts/smoke-pack.sh",
     "validate": "tsx src/cli/validate.ts",
     "check-balance": "tsx src/cli/check-balance.ts",
     "contribute": "tsx src/cli/run.ts",
@@ -16,11 +47,11 @@
     "test": "tsx --test test/*.test.ts src/balance/adapters/*/*.test.ts"
   },
   "dependencies": {
-    "tsx": "4.23.15",
     "yaml": "2.9.1"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
+    "tsx": "4.23.15",
     "typescript": "5.9.3"
   }
 }

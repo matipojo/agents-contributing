@@ -1,0 +1,71 @@
+name: publish
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack and print what would be published, without uploading"
+        type: boolean
+        default: true
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing requires npm >= 11.5.1.
+      - name: Install npm 11
+        run: npm install -g npm@11.21.2
+
+      - run: npm ci
+
+      - name: Check that the tag matches the package version
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${version}."
+            echo "The tag without the leading v must equal the version. See docs/RELEASING.md."
+            exit 1
+          fi
+
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+      - name: Publish to npm (token)
+        if: env.HAS_NPM_TOKEN == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          args=(--provenance --access public)
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${{ inputs.dry_run }}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          npm publish "${args[@]}"
+
+      - name: Publish to npm (trusted publishing)
+        if: env.HAS_NPM_TOKEN != 'true'
+        run: |
+          set -euo pipefail
+          args=(--provenance --access public)
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${{ inputs.dry_run }}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          # setup-node writes an .npmrc that requires a token. Unset it so npm uses OIDC.
+          unset NODE_AUTH_TOKEN
+          npm publish "${args[@]}"

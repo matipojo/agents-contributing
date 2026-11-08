@@ -116,7 +116,7 @@ export class GitHub {
     return this.request<string>("GET", `/repos/${name}/pulls/${number}`, undefined, "application/vnd.github.diff");
   }
 
-  reviews(name: string, number: number): Promise<{ user: { login: string } | null; body: string }[]> {
+  reviews(name: string, number: number): Promise<{ user: { login: string } | null; body: string | null; submitted_at?: string }[]> {
     return this.request("GET", `/repos/${name}/pulls/${number}/reviews?per_page=100`);
   }
 

@@ -126,6 +126,43 @@ function pastContributions(items: Issue[], t: { repo: string; login: string; dry
   return past;
 }
 
+/**
+ * Reviews are contributions too, but they are not issue bodies. Marked reviews on the pull
+ * requests we already listed count toward weekly and cooldown limits (not the open cap: a
+ * review is not an open item). The local log covers a review whose pull request was not in
+ * that list; a review already seen from GitHub is not counted twice.
+ */
+async function pastWithReviews(gh: GitHub, name: string, items: Issue[], login: string, dryRun: boolean): Promise<Contribution[]> {
+  const past = pastContributions(items, { repo: name, login, dryRun });
+  for (const p of items) {
+    if (!p.pull_request) continue;
+    for (const r of await gh.reviews(name, p.number)) {
+      const type = markerType(r.body);
+      if (!type || r.user?.login !== login) continue;
+      const at = new Date(r.submitted_at ?? p.updated_at ?? p.created_at);
+      if (Number.isNaN(at.getTime())) continue;
+      past.push({ type, author: login, open: false, at });
+    }
+  }
+  if (dryRun) return past;
+  const logPath = join(HOME, "contributions.jsonl");
+  if (!existsSync(logPath)) return past;
+  for (const line of readFileSync(logPath, "utf8").split("\n").filter(Boolean)) {
+    let e: { type?: string; repo?: string; at?: string };
+    try {
+      e = JSON.parse(line) as { type?: string; repo?: string; at?: string };
+    } catch {
+      continue;
+    }
+    if (e.repo !== name || e.type !== "review" || !e.at) continue;
+    const at = new Date(e.at);
+    if (Number.isNaN(at.getTime())) continue;
+    const seen = past.some((c) => c.type === "review" && c.author === login && Math.abs(c.at.getTime() - at.getTime()) < 10 * 60_000);
+    if (!seen) past.push({ type: "review", author: login, open: false, at });
+  }
+  return past;
+}
+
 interface Target {
   repo: Repo;
   file: AgentsContributing;
@@ -194,7 +231,7 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
     if (!allowedProvider(read.file, ctx.vendor, cfg.provider)) { skipped[name] = "the providers list excludes this agent"; continue; }
     const since = new Date(now.getTime() - 30 * 24 * 3_600_000).toISOString();
     const items = await gh.issues(name, `state=all&since=${since}`);
-    const past = pastContributions(items, { repo: name, login, dryRun: ctx.dryRun });
+    const past = await pastWithReviews(gh, name, items, login, ctx.dryRun);
     targets.push({ target: { repo, file: read.file, notes: read.notes, items, past }, rejections: rejectionsOf(items, login) });
   }
   const all = targets.flatMap((t) => t.rejections);
@@ -339,7 +376,7 @@ async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promi
   if (h.scope !== t.scope) return `help_${t.type} changed its scope to ${h.scope}`;
   if (!allowedProvider(now.file, t.vendor, t.provider)) return "the providers list now excludes this agent";
   const items = await gh.issues(t.repo, `state=all&since=${new Date(Date.now() - 30 * 24 * 3_600_000).toISOString()}`);
-  const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, pastContributions(items, t), new Date());
+  const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, await pastWithReviews(gh, t.repo, items, t.login, t.dryRun), new Date());
   if (left.left <= 0) return `the limits no longer allow it: ${left.reason}`;
   if (changes) {
     const errors = checkChange(changes, { forbidden: effectiveForbiddenPaths(now.file, t.type), maxDiffLines: h.max_diff_lines, require: h.require });

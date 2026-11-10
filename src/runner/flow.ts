@@ -133,6 +133,68 @@ function pastContributions(items: Issue[], t: { repo: string; login: string; dry
   return past;
 }
 
+/** URL, or id when the review has no URL. The same value from GitHub and the local log is one contribution. */
+function reviewIdentity(e: { html_url?: string | null; url?: string | null; id?: number | string | null }): string | undefined {
+  for (const value of [e.html_url, e.url]) {
+    if (typeof value === "string" && value !== "") return value;
+  }
+  if (typeof e.id === "number" && Number.isFinite(e.id)) return `id:${e.id}`;
+  if (typeof e.id === "string" && e.id !== "") return `id:${e.id}`;
+  return undefined;
+}
+
+/**
+ * True when a logged review is one already recorded. Distinct URLs or ids are distinct
+ * reviews even a minute apart. A GitHub review that carried neither still matches the log
+ * line for that same submission time.
+ */
+function sameReview(c: Contribution & { url?: string }, url: string | undefined, at: Date): boolean {
+  if (c.url && url) return c.url === url;
+  // An unnamed GitHub review is the log line from that same submission. Two
+  // named reviews stay distinct even when their timestamps match.
+  if (!c.url) return c.at.getTime() === at.getTime();
+  return false;
+}
+
+/**
+ * Reviews are contributions too, but they are not issue bodies. Marked reviews on the pull
+ * requests we already listed count toward weekly and cooldown limits (not the open cap: a
+ * review is not an open item). The local log covers a review whose pull request was not in
+ * that list. Each review URL or id counts once, whether it came from GitHub, the log, or both.
+ */
+async function pastWithReviews(gh: GitHub, name: string, items: Issue[], login: string, dryRun: boolean): Promise<Contribution[]> {
+  const past: (Contribution & { url?: string })[] = pastContributions(items, { repo: name, login, dryRun });
+  for (const p of items) {
+    if (!p.pull_request) continue;
+    for (const r of await gh.reviews(name, p.number)) {
+      const type = markerType(r.body);
+      if (!type || r.user?.login !== login) continue;
+      const at = new Date(r.submitted_at ?? p.updated_at ?? p.created_at);
+      if (Number.isNaN(at.getTime())) continue;
+      const url = reviewIdentity(r);
+      past.push(url ? { type, author: login, open: false, at, url } : { type, author: login, open: false, at });
+    }
+  }
+  if (dryRun) return past;
+  const logPath = join(HOME, "contributions.jsonl");
+  if (!existsSync(logPath)) return past;
+  for (const line of readFileSync(logPath, "utf8").split("\n").filter(Boolean)) {
+    let e: { type?: string; repo?: string; at?: string; url?: string | null; html_url?: string | null; id?: number | string | null };
+    try {
+      e = JSON.parse(line) as { type?: string; repo?: string; at?: string; url?: string | null; html_url?: string | null; id?: number | string | null };
+    } catch {
+      continue;
+    }
+    if (e.repo !== name || e.type !== "review" || !e.at) continue;
+    const at = new Date(e.at);
+    if (Number.isNaN(at.getTime())) continue;
+    const url = reviewIdentity(e);
+    const seen = past.some((c) => c.type === "review" && c.author === login && sameReview(c, url, at));
+    if (!seen) past.push(url ? { type: "review", author: login, open: false, at, url } : { type: "review", author: login, open: false, at });
+  }
+  return past;
+}
+
 /**
  * Open items have no age cutoff: a contribution that is still open after 30 days still counts,
  * and an old labeled issue is still a task. The 30-day query adds recent closes, weekly counts
@@ -213,7 +275,7 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
     if (typeof read === "string") { skipped[name] = read; continue; }
     if (!allowedProvider(read.file, ctx.vendor, cfg.provider)) { skipped[name] = "the providers list excludes this agent"; continue; }
     const items = await contributionItems(gh, name, now);
-    const past = pastContributions(items, { repo: name, login, dryRun: ctx.dryRun });
+    const past = await pastWithReviews(gh, name, items, login, ctx.dryRun);
     targets.push({ target: { repo, file: read.file, notes: read.notes, items, past }, rejections: rejectionsOf(items, login) });
   }
   const all = targets.flatMap((t) => t.rejections);
@@ -364,7 +426,7 @@ async function stillAllowed(gh: GitHub, t: TaskState, changes?: Change[]): Promi
   if (h.scope !== t.scope) return `help_${t.type} changed its scope to ${h.scope}`;
   if (!allowedProvider(now.file, t.vendor, t.provider)) return "the providers list now excludes this agent";
   const items = await contributionItems(gh, t.repo, new Date());
-  const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, pastContributions(items, t), new Date());
+  const left = allowance(effectiveLimits(now.file, t.type), h.limits ?? {}, t.type, t.login, await pastWithReviews(gh, t.repo, items, t.login, t.dryRun), new Date());
   if (left.left <= 0) return `the limits no longer allow it: ${left.reason}`;
   if (changes) {
     const errors = checkChange(changes, { forbidden: effectiveForbiddenPaths(now.file, t.type), maxDiffLines: h.max_diff_lines, require: h.require });

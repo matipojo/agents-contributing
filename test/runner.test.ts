@@ -277,6 +277,151 @@ test("review: a labeled pull request this contributor opened is reviewed, once",
   assert.equal((await pick(ctx)).task, undefined, "never twice");
 });
 
+test("a marked review counts toward weekly and cooldown limits", async () => {
+  const { pick, submit } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { HOME, loadConfig } = await import("../src/balance/config.ts");
+  const { execFileSync } = await import("node:child_process");
+  const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const marker = "agents-contributing: v1 type=review provider=openai model=m runner=r from=me";
+  const ago = new Date(Date.now() - 2 * 3_600_000).toISOString();
+  const pr = (number: number, labels: string[]) => ({
+    number, title: `#${number}`, body: "fix", state: "open", user: { login: "someone" },
+    labels: labels.map((name) => ({ name })), pull_request: {}, created_at: ago, updated_at: ago, html_url: "",
+  });
+  const asked: number[] = [];
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  gh.issues = async () => [pr(1, []), pr(2, ["agents:review-wanted"])];
+  gh.reviews = async (_name, number) => {
+    asked.push(number);
+    return number === 1 ? [{ user: { login: "me" }, body: marker, submitted_at: ago }] : [];
+  };
+  const posted: number[] = [];
+  gh.review = async (_name, number) => { posted.push(number); return { html_url: "https://example/r" }; };
+  const limits = (weekly: number, cooldown: number, ownWeekly: boolean) =>
+    `limits:\n  max_open_agent_contributions: 5\n  max_per_contributor_per_week: ${weekly}\n  cooldown_hours: ${cooldown}\n`;
+  const review = (own: string) => `---\nversion: 1\nhelp_review:\n  enabled: true\n  scope: label:agents:review-wanted\n  output: review\n${own}---\n`;
+  let text = review(`  limits:\n    max_open_agent_contributions: 5\n    max_per_contributor_per_week: 1\n    cooldown_hours: 0\n${limits(5, 0, true)}`);
+  gh.file = async () => text;
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["review"], log: false };
+  const ctx = { cfg, gh, login: "me", runnerRepo: null, vendor: "test", dryRun: true, forced: false, notes: [] as string[] };
+
+  const weekly = await pick(ctx);
+  assert.equal(weekly.task, undefined);
+  assert.match(Object.values(weekly.skipped).join(" "), /this week/);
+  assert.ok(asked.includes(1), "the previous review's pull request is loaded, not only the candidate");
+
+  text = review(`  limits:\n    max_open_agent_contributions: 5\n    max_per_contributor_per_week: 5\n    cooldown_hours: 24\n${limits(5, 0, true)}`);
+  const cooled = await pick(ctx);
+  assert.equal(cooled.task, undefined);
+  assert.match(Object.values(cooled.skipped).join(" "), /cooldown_hours/);
+
+  // Weekly limit is inherited: the help type does not set its own, so every type counts, including a review.
+  text = review(`  limits:\n    max_open_agent_contributions: 5\n    cooldown_hours: 0\n${limits(1, 0, false)}`);
+  const inherited = await pick(ctx);
+  assert.equal(inherited.task, undefined);
+  assert.match(Object.values(inherited.skipped).join(" "), /this week/);
+
+  const dir = mkdtempSync(join(tmpdir(), "ac-review-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  text = review(`  limits:\n    max_open_agent_contributions: 5\n    max_per_contributor_per_week: 1\n    cooldown_hours: 0\n${limits(5, 0, true)}`);
+  const task: import("../src/runner/flow.ts").TaskState = {
+    id: "review-limit", type: "review", repo: "owner/repo", dir, baseSha: "", defaultBranch: "main",
+    pushAccess: false, scope: "label:agents:review-wanted", forbidden: [], require: [], prompt: "", replyFile: "",
+    runnerRepo: null, login: "me", vendor: "test", provider: "test", forced: false, dryRun: false, pull: { number: 2 },
+  };
+  const logPath = join(HOME, "contributions.jsonl");
+  const hadLog = existsSync(logPath);
+  const before = hadLog ? readFileSync(logPath, "utf8") : "";
+  try {
+    const done = await submit(cfg, gh, task, JSON.stringify({ body: "Looks fine" }), "test", []);
+    assert.match(String(done.aborted), /this week/);
+    assert.deepEqual(posted, []);
+    // A review that is only in the local log still counts, and one GitHub already returned is not counted twice.
+    gh.reviews = async () => [];
+    mkdirSync(HOME, { recursive: true });
+    const line = JSON.stringify({ v: 1, type: "review", repo: "owner/repo", url: "https://example/r", provider: "x", model: "m", runner: "r", at: ago });
+    writeFileSync(logPath, `${before}${line}\n`);
+    const fromLog = await pick({ ...ctx, dryRun: false });
+    assert.equal(fromLog.task, undefined);
+    assert.match(Object.values(fromLog.skipped).join(" "), /this week/);
+    text = review(`  limits:\n    max_open_agent_contributions: 5\n    max_per_contributor_per_week: 2\n    cooldown_hours: 0\n${limits(5, 0, true)}`);
+    gh.reviews = async (_name, number) => number === 1 ? [{ user: { login: "me" }, body: marker, submitted_at: ago }] : [];
+    const once = await pick({ ...ctx, dryRun: false });
+    assert.equal(once.task?.pull?.number, 2, "the log line and the GitHub review are the same contribution");
+  } finally {
+    if (hadLog) writeFileSync(logPath, before);
+    else if (existsSync(logPath)) rmSync(logPath);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("distinct nearby reviews both count, and the same GitHub review counts once", async () => {
+  const { pick } = await import("../src/runner/flow.ts");
+  const { GitHub } = await import("../src/runner/github.ts");
+  const { HOME, loadConfig } = await import("../src/balance/config.ts");
+  const { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const marker = "agents-contributing: v1 type=review provider=openai model=m runner=r from=me";
+  const file = (weekly: number) => `---
+version: 1
+help_audit:
+  enabled: true
+  scope: path:src/
+  output: issue
+limits:
+  max_open_agent_contributions: 5
+  max_per_contributor_per_week: ${weekly}
+  cooldown_hours: 0
+---
+`;
+  const gh = new GitHub(null);
+  gh.repo = async () => ({ full_name: "owner/repo", default_branch: "main", private: false });
+  let text = file(2);
+  gh.file = async () => text;
+  gh.issues = async () => [];
+  gh.reviews = async () => [];
+  const cfg = { ...loadConfig("templates/contributor.yml"), targets: { repos: ["owner/repo"], topics: [] }, help_types: ["audit"], log: false };
+  const ctx = { cfg, gh, login: "me", runnerRepo: null, vendor: "test", dryRun: false, forced: false, notes: [] as string[] };
+  const logPath = join(HOME, "contributions.jsonl");
+  const hadLog = existsSync(logPath);
+  const before = hadLog ? readFileSync(logPath, "utf8") : "";
+  const minute = new Date(Date.now() - 60 * 60_000);
+  const nearby = new Date(minute.getTime() + 60_000).toISOString();
+  const line = (url: string, at: string) => JSON.stringify({ v: 1, type: "review", repo: "owner/repo", url, provider: "x", model: "m", runner: "r", at });
+  mkdirSync(HOME, { recursive: true });
+  try {
+    writeFileSync(logPath, `${line("https://github.com/owner/repo/pull/1#pullrequestreview-1", minute.toISOString())}\n${line("https://github.com/owner/repo/pull/2#pullrequestreview-2", nearby)}\n`);
+    const exhausted = await pick(ctx);
+    assert.equal(exhausted.task, undefined, "two different review URLs a minute apart fill a weekly limit of 2");
+    assert.match(Object.values(exhausted.skipped).join(" "), /this week/);
+    text = file(3);
+    const both = await pick(ctx);
+    assert.equal(both.task?.type, "audit");
+    assert.equal(both.task?.left, 1, "both logged reviews count, so one of three remains");
+
+    const submitted = new Date(Date.now() - 3 * 3_600_000);
+    const logged = new Date(submitted.getTime() - 30 * 60_000).toISOString();
+    const url = "https://github.com/owner/repo/pull/7#pullrequestreview-42";
+    text = file(2);
+    gh.issues = async () => [{
+      number: 7, title: "Reviewed", body: "body", state: "open", user: { login: "someone" },
+      labels: [], pull_request: {}, created_at: submitted.toISOString(), updated_at: submitted.toISOString(), html_url: "",
+    }];
+    gh.reviews = async () => [{ id: 42, html_url: url, user: { login: "me" }, body: marker, submitted_at: submitted.toISOString() }];
+    writeFileSync(logPath, `${line(url, logged)}\n`);
+    const once = await pick(ctx);
+    assert.equal(once.task?.type, "audit");
+    assert.equal(once.task?.left, 1, "the GitHub review and the log line with its URL are one contribution");
+  } finally {
+    if (hadLog) writeFileSync(logPath, before);
+    else if (existsSync(logPath)) rmSync(logPath);
+  }
+});
+
 test("an audit submits only as many findings as the allowance at submit time", async () => {
   const { submit } = await import("../src/runner/flow.ts");
   const { GitHub } = await import("../src/runner/github.ts");

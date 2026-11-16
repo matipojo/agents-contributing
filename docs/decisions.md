@@ -35,6 +35,7 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 19. We decided the contributor chooses which repositories or topics to support and which help types, because it is their donation.
 20. We decided the contributor sets how much of the surplus to give and always keeps a margin, because donating must never hurt their own work.
 21. We decided the runner only starts within a set number of hours before the reset, because before that the contributor may still need the capacity.
+69. We decided the runner contributes only to repositories the contributor approved, that the topic only finds candidates and reports them, and that the project's own repository is approved from the start, because anyone can add the topic and the file to a repository, the agent then runs that repository's code next to the contributor's logins, and the contributor already runs this repository's code as the runner. `auto_approve` restores contributing by topic for those who run fully isolated. This changes 16 and 64: discovery still uses the topic, and joining now asks one question.
 
 ## Runner and safety
 

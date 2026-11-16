@@ -154,7 +154,7 @@ interface Target {
   past: Contribution[];
 }
 
-async function readFile(gh: GitHub, name: string): Promise<{ file: AgentsContributing; notes: string } | string> {
+export async function readFile(gh: GitHub, name: string): Promise<{ file: AgentsContributing; notes: string } | string> {
   const repo = await gh.repo(name);
   const text = await gh.file(name, "AGENTS-CONTRIBUTING.md", repo.default_branch);
   if (text === null) return "no AGENTS-CONTRIBUTING.md on the default branch";
@@ -190,14 +190,29 @@ function contributedToday(ctx: Context, now: Date): boolean {
 /** Chooses the first task that every rule allows, or reports why there is none. */
 export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record<string, string> }> {
   const { cfg, gh, login, runnerRepo, notes } = ctx;
+  // Only repositories the contributor approved are contributed to. Anyone can add the topic
+  // and the file to a repository, and the agent then runs that repository's code, so what a
+  // topic search finds is only reported, and waits for the contributor's approval.
   const names = new Set(cfg.targets.repos);
+  const waiting = new Set<string>();
   for (const topic of cfg.targets.topics) {
     try {
       const found = await gh.request<{ items: { full_name: string }[] }>("GET", `/search/repositories?q=topic:${encodeURIComponent(topic)}&per_page=50`);
-      for (const r of found.items) names.add(r.full_name);
+      for (const r of found.items) {
+        if (cfg.targets.auto_approve === true) names.add(r.full_name);
+        else if (!names.has(r.full_name) && r.full_name !== runnerRepo) waiting.add(r.full_name);
+      }
     } catch (e) {
       notes.push(`Topic search for "${topic}" failed (${(e as Error).message.slice(0, 80)}); using targets.repos only.`);
     }
+  }
+  if (waiting.size > 0) {
+    const list = [...waiting];
+    notes.push(
+      `${list.length} repositor${list.length === 1 ? "y asks" : "ies ask"} for help and ${list.length === 1 ? "is" : "are"} not approved: ` +
+      `${list.slice(0, 20).join(", ")}${list.length > 20 ? ", ..." : ""}. Nothing is contributed there. ` +
+      "To approve one after looking at it: run.ts approve <owner/name>.",
+    );
   }
   const skipped: Record<string, string> = {};
   const now = new Date();

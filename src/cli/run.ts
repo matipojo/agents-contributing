@@ -12,6 +12,11 @@
  *   run.ts submit <task id> --model <model> [config]
  *       Checks what the agent did against the rules, then submits it and logs it.
  *
+ *   run.ts approve <owner/name>...
+ *       Lets the runner contribute to these repositories from now on, after checking each has a
+ *       valid AGENTS-CONTRIBUTING.md. Only approved repositories are contributed to; what a
+ *       topic search finds is reported and waits. Writes targets.repos in the config.
+ *
  *   --dry-run  do everything except writing to GitHub; print what would be submitted
  *   --force    contribute even when the balance check says not to (recorded in the output and log)
  *
@@ -23,6 +28,7 @@ import { DEFAULT_CONFIG_PATH, loadConfig } from "../balance/config.ts";
 import { ADAPTERS } from "../balance/adapters/index.ts";
 import { findToken, GitHub } from "../runner/github.ts";
 import { loadTask, pick, prepare, setup, submit } from "../runner/flow.ts";
+import { approve } from "../runner/approve.ts";
 
 const args = process.argv.slice(2);
 const take = (f: string, withValue = false): string | boolean | undefined => {
@@ -31,7 +37,8 @@ const take = (f: string, withValue = false): string | boolean | undefined => {
   const [, value] = args.splice(i, withValue ? 2 : 1);
   return withValue ? value : true;
 };
-const mode = args[0] === "next" || args[0] === "submit" ? args.shift()! : "launch";
+const mode = args[0] === "next" || args[0] === "submit" || args[0] === "approve" ? args.shift()! : "launch";
+const toApprove = mode === "approve" ? args.splice(0) : [];
 const taskId = mode === "submit" ? args.shift() : undefined;
 const force = take("--force") === true;
 const dryRunFlag = take("--dry-run") === true;
@@ -47,6 +54,12 @@ function finish(code: number, result: Record<string, unknown>): never {
 }
 
 async function main(): Promise<void> {
+  if (mode === "approve") {
+    if (toApprove.length === 0) throw new Error("Usage: run.ts approve <owner/name>...");
+    const results = await approve(new GitHub(token), toApprove, DEFAULT_CONFIG_PATH);
+    const all = results.every((r) => r.approved);
+    finish(all ? 0 : 2, { result: all ? "approved" : "not-all-approved", repositories: results, config: DEFAULT_CONFIG_PATH });
+  }
   if (mode === "submit") {
     if (!taskId) throw new Error("Usage: run.ts submit <task id> --model <model>");
     const t = loadTask(taskId);

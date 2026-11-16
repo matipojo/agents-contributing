@@ -196,3 +196,19 @@ export function slowedDown(rejections: Rejection[], now: Date): boolean {
 export function mayRunPullCode(pull: { user: { login: string } | null; author_association?: string }, me: string): boolean {
   return pull.user?.login === me || pull.author_association === "OWNER";
 }
+
+/** After this many days the runner says its own code is old. It never updates itself. */
+export const STALE_DAYS = 60;
+
+/**
+ * A note when the runner's code is old, or null. The runner stays at the commit the
+ * contributor chose, so it must say when that commit is far behind: otherwise a fix to the
+ * runner itself would never reach them.
+ */
+export function staleNote(committedAt: Date | null, now: Date): string | null {
+  if (!committedAt) return null;
+  const days = Math.floor((now.getTime() - committedAt.getTime()) / (24 * 3_600_000));
+  if (days <= STALE_DAYS) return null;
+  return `The runner's code is ${days} days old. It stays at the commit you chose and never updates itself. ` +
+    'To look at what changed and update: skills/contribute/SKILL.md, "Update the runner".';
+}

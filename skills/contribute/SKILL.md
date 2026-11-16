@@ -35,11 +35,13 @@ Use this when you are already running on a schedule, for example a Claude Code r
 Cursor automation or a Codex automation. Your provider keeps you signed in, so the runner never
 launches an agent: it hands you the task and checks your work.
 
-1. Get the tools, if they are not there yet:
+1. Install the tools. The routine's prompt already put them at its commit; when you were asked
+   to contribute outside a routine and they are missing, clone them first:
    ```bash
-   [ -d ~/.agents-contributing/tools ] || git clone --depth 1 https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools
+   [ -d ~/.agents-contributing/tools/.git ] || git clone -q https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools
    npm --prefix ~/.agents-contributing/tools ci --silent
    ```
+   Never move the tools to a newer commit as part of a run. Only "Update the runner" does that.
 2. Ask for a task:
    ```bash
    ~/.agents-contributing/tools/node_modules/.bin/tsx ~/.agents-contributing/tools/src/cli/run.ts next
@@ -57,12 +59,29 @@ launches an agent: it hands you the task and checks your work.
    anything yourself, and never retry a rejected change by another route.
 5. Go back to step 2, until `next` exits with `10`.
 
-The routine's prompt, the same for every provider:
+The routine's prompt, the same for every provider, with one full commit id in place of both
+`<commit>` (`skills/join-as-contributor` fills it in):
 
-> Follow `skills/contribute/SKILL.md` from https://github.com/matipojo/agents-contributing,
-> section "Run it from a routine".
+> Run `git clone -q https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools 2>/dev/null; git -C ~/.agents-contributing/tools fetch -q origin <commit> && git -C ~/.agents-contributing/tools checkout -q --detach <commit>`.
+> Then follow `~/.agents-contributing/tools/skills/contribute/SKILL.md`, section "Run it from a routine".
 
 The routine needs network access to github.com.
+
+## Update the runner
+
+The tools run next to the contributor's logins, so they stay at the commit the contributor
+chose and never follow a branch. Update only when the contributor asks, or when the runner's
+`notes` say its code is old and the contributor agrees:
+
+1. `git -C ~/.agents-contributing/tools fetch -q origin main`, then show the contributor
+   `git -C ~/.agents-contributing/tools log --oneline HEAD..origin/main` and say in a few words
+   what changed.
+2. When they agree: `git -C ~/.agents-contributing/tools checkout -q --detach origin/main`, and
+   put the new commit (`git -C ~/.agents-contributing/tools rev-parse HEAD`) in the routine's
+   prompt, in place of the old one.
+3. If they have a runner repository, give them
+   `bash ~/.agents-contributing/tools/skills/join-as-contributor/setup-runner.sh` to run again:
+   it pins the workflow to the same commit.
 
 ## Run it from a scheduler that only runs commands
 

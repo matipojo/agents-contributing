@@ -29,18 +29,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
+      # The commit of the agents-contributing tools this runner runs: the one you set it up
+      # from. The tools run with this repository's secrets, so they are never taken from a
+      # branch, which can change under you. To update, update your local tools and run
+      # setup-runner.sh again; it writes the new commit here.
+      TOOLS_REF: "__TOOLS_REF__"
       AGENTS_CONTRIBUTING_HOME: ${{ github.workspace }}
       AGENTS_CONTRIBUTING_GITHUB_TOKEN: ${{ secrets.AGENTS_CONTRIBUTING_GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
       - name: Get the tools
         run: |
-          git clone --quiet --depth 1 https://github.com/matipojo/agents-contributing "$RUNNER_TEMP/tools"
+          # Only a full commit id: a branch or tag name could be moved to other code.
+          echo "$TOOLS_REF" | grep -Eq '^[0-9a-f]{40}$' || { echo "TOOLS_REF must be a full commit id. Run setup-runner.sh again."; exit 1; }
+          git init --quiet "$RUNNER_TEMP/tools"
+          git -C "$RUNNER_TEMP/tools" fetch --quiet --depth 1 https://github.com/matipojo/agents-contributing "$TOOLS_REF"
+          git -C "$RUNNER_TEMP/tools" checkout --quiet --detach FETCH_HEAD
+          [ "$(git -C "$RUNNER_TEMP/tools" rev-parse HEAD)" = "$TOOLS_REF" ]
           npm --prefix "$RUNNER_TEMP/tools" ci --silent
 
       - name: Install the agent

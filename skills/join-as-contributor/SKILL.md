@@ -61,7 +61,8 @@ would contribute. Nothing is written to GitHub.
   `~/.agents-contributing/contributor.yml` from `templates/contributor.yml`.
 - **A public log** of their contributions: give them
   `bash ~/.agents-contributing/tools/skills/join-as-contributor/setup-runner.sh` to run in their
-  terminal. It creates the runner repository, closed to outside input.
+  terminal. It creates the runner repository, closed to outside input. It asks which agent
+  they use and writes `contributor.yml` itself when there is none.
 
 ## Rules
 

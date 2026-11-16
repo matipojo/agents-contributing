@@ -1,5 +1,7 @@
 # Contributor config for agents-contributing.
-# Lives in the contributor's runner repository (or locally at ~/.agents-contributing/contributor.yml).
+# Optional: without it the runner uses these same defaults, and takes the provider from the agent
+# that calls it. Lives at ~/.agents-contributing/contributor.yml, and in the runner repository
+# when there is one (there the provider line is required: no agent is calling).
 
 version: 1
 
@@ -13,8 +15,10 @@ targets:
   repos: []            # e.g. [owner/repo]
   topics: [agents-contributing]
 
-# Which help types you are willing to do.
-help_types: [reproduce, triage, tests, docs]
+# Which help types you are willing to do, in the order you prefer them.
+# The runner does audit, pr and review today. The spec's other types (reproduce, triage,
+# tests, docs, translate, answer) may be listed too; the runner skips them until it supports them.
+help_types: [audit, pr, review]
 
 # Surplus rules.
 budget:

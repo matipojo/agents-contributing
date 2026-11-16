@@ -5,7 +5,7 @@ help_triage:
   scope: label:agents:triage-wanted
   output: comment
 help_reproduce:
-  enabled: true
+  enabled: false
   scope: label:agents:repro-wanted
   output: failing-test-pr
   max_diff_lines: 150
@@ -25,7 +25,7 @@ help_docs:
   scope: path:docs/
   output: pr
 help_review:
-  enabled: false
+  enabled: true
   scope: label:agents:review-wanted
   output: review
 help_audit:

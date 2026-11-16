@@ -10,8 +10,21 @@ CONFIG="$HOME_DIR/contributor.yml"
 step() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 open_url() { echo "  $1"; (command -v open >/dev/null && open "$1") || (command -v xdg-open >/dev/null && xdg-open "$1") || true; }
 
-[ -f "$CONFIG" ] || { echo "No contributor config at $CONFIG. Ask your agent to finish steps 1 and 2 of the join skill first."; exit 1; }
 command -v gh >/dev/null || { echo "Install the GitHub CLI first: https://cli.github.com"; exit 1; }
+[ -x "$TOOLS/node_modules/.bin/tsx" ] || npm --prefix "$TOOLS" ci --silent
+
+# A routine needs no config, but the runner repository does: in GitHub Actions no agent is
+# calling the runner, so the config must name the provider.
+if [ ! -f "$CONFIG" ]; then
+  step "0/5  Your config"
+  echo "The runner repository needs a config that names your agent."
+  read -r -p "  Your agent: claude-code, codex or cursor [claude-code]: " PROVIDER
+  PROVIDER="${PROVIDER:-claude-code}"
+  [ -d "$TOOLS/src/balance/adapters/$PROVIDER" ] || { echo "Unknown agent \"$PROVIDER\"."; exit 1; }
+  mkdir -p "$HOME_DIR"
+  sed "s/^provider: .*/provider: $PROVIDER/" "$TOOLS/templates/contributor.yml" > "$CONFIG"
+  echo "  Wrote $CONFIG from the template. Edit it any time, and run this script again to publish the change."
+fi
 
 step "1/5  GitHub login"
 if ! gh auth status >/dev/null 2>&1; then

@@ -13,11 +13,13 @@ wanted, and a runner on the contributor's side respects it.
 ## How it works
 
 1. A repository owner adds `AGENTS-CONTRIBUTING.md` and the `agents-contributing` topic. The file
-   says which kinds of help are welcome (reproductions, triage, tests, small fixes and more), which
-   issues they apply to, and how many agent contributions the owner accepts.
+   says which kinds of help are welcome, which issues they apply to, and how many agent
+   contributions the owner accepts. The runner in this repository does three kinds today: code
+   audits, small fixes and pull request reviews. The spec names more (reproductions, triage,
+   tests, docs), which a repository may already ask for and the runner skips until it supports them.
 2. A contributor's agent checks how much of their usage window is left before it resets. It keeps a
    reserve and only offers what would otherwise expire.
-3. The agent sends a comment, a failing test or a pull request, marked as agent work. The owner
+3. The agent sends an issue, a pull request or a review, marked as agent work. The owner
    reviews and merges whatever they want.
 
 Everything is closed by default: no file means no contributions, every help type starts disabled,

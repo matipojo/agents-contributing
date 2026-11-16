@@ -46,7 +46,11 @@ Ask in plain words, one short list. Recommend starting small:
 | `review` | PRs wait a long time for review | Medium: noise if low quality |
 | `audit` | Code nobody has reviewed in a while | Medium: issues only, but can be noisy. Pair it with `pr` scoped to a label, so you pick which findings get fixed |
 
-If the owner has no preference, propose `reproduce` only, scoped to a label.
+The runner in this repository does `audit`, `pr` and `review` today. The other types are in
+the spec, and a file may enable them, but no contribution arrives for them until a runner
+supports them. Tell the owner this before they choose.
+
+If the owner has no preference, propose `review` only, scoped to a label.
 
 Also ask for limits. Defaults to propose: 3 open agent contributions, 1 per contributor per week,
 24 hour cooldown. If the owner wants one help type to move slower (for example `help_pr`),
@@ -57,7 +61,7 @@ set only those limits under that type's own `limits`; the rest fall back to the 
 Start from `~/.agents-contributing/tools/templates/AGENTS-CONTRIBUTING.md`.
 
 - Enable only the help types the owner chose. Every enabled type needs a `scope`.
-- Prefer label scopes (`label:agents:repro-wanted`) over path scopes, so the owner picks each task.
+- Prefer label scopes (`label:agents:review-wanted`) over path scopes, so the owner picks each task.
 - Keep `.github/` in the top-level `forbidden_paths`, so it applies to every help type. Add lockfiles
   and release scripts there too unless the owner objects. Use a help type's own `forbidden_paths`
   only for paths that matter to that type alone. For any type that produces code, set `max_diff_lines`.

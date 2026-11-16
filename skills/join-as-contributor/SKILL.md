@@ -37,7 +37,7 @@ provider is already signed in. (Do not use `gh auth status`: it can fail where w
 
 Create a daily routine with the scheduler the agent has: a Claude Code routine (`/schedule`),
 a Codex automation, or a Cursor automation. Its prompt, the same for every agent, with the
-tools' current commit (`git -C ~/.agents-contributing/tools rev-parse HEAD`) in place of both
+current commit of `main` (`git ls-remote https://github.com/matipojo/agents-contributing main`) in place of both
 `<commit>`, so the routine never follows a branch:
 
 > Run `git clone -q https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools 2>/dev/null; git -C ~/.agents-contributing/tools fetch -q origin <commit> && git -C ~/.agents-contributing/tools checkout -q --detach <commit>`.

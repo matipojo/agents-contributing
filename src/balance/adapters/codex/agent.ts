@@ -3,7 +3,11 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Agent } from "../../types.ts";
+import { agentEnv } from "../agent-env.ts";
 import { CODEX_BIN, codexHome, findRollout } from "./adapter.ts";
+
+/** What Codex itself reads to sign in and find its files. Nothing else of the runner's reaches it. */
+export const CODEX_ENV = /^(CODEX_[A-Z0-9_]+|OPENAI_[A-Z0-9_]+)$/;
 
 /**
  * Runs Codex for the contribution runner: `codex exec` in the checkout, read-only or with
@@ -16,7 +20,7 @@ export const codexAgent: Agent = {
     const events = execFileSync(CODEX_BIN, [
       "exec", "--json", "--skip-git-repo-check", "--sandbox", write ? "workspace-write" : "read-only",
       "-o", out, prompt,
-    ], { cwd, encoding: "utf8", timeout: 3_600_000, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+    ], { cwd, env: agentEnv(CODEX_ENV), encoding: "utf8", timeout: 3_600_000, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
     const threadId = /"thread_id":"([^"]+)"/.exec(events)?.[1];
     const file = threadId ? findRollout(join(codexHome(), "sessions"), threadId) : null;
     const model = file ? /"model":"([^"]+)"/.exec(readFileSync(file, "utf8"))?.[1] : undefined;

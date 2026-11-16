@@ -120,7 +120,10 @@ export const claudeCode: Adapter = {
   detect: (env) => env.CLAUDECODE === "1",
   processNames: ["claude"],
   ci: {
-    install: "npm install --global --silent @anthropic-ai/claude-code",
+    // bubblewrap and socat are what Claude Code's command sandbox runs on. Ubuntu 24.04 stops
+    // an unprivileged bubblewrap from starting until that AppArmor restriction is lifted.
+    install: "npm install --global --silent @anthropic-ai/claude-code && sudo apt-get install --yes --quiet bubblewrap socat > /dev/null" +
+      " && (sudo sysctl --quiet --write kernel.apparmor_restrict_unprivileged_userns=0 || true)",
     secret: {
       name: "CLAUDE_CODE_OAUTH_TOKEN",
       command: "claude setup-token",

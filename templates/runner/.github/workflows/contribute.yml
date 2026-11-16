@@ -30,7 +30,6 @@ jobs:
     timeout-minutes: 120
     env:
       AGENTS_CONTRIBUTING_HOME: ${{ github.workspace }}
-      AGENTS_CONTRIBUTING_GITHUB_TOKEN: ${{ secrets.AGENTS_CONTRIBUTING_GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,11 +44,15 @@ jobs:
 
       - name: Install the agent
         # The provider's adapter says how; it fails here if the provider cannot run in Actions.
-        env:
-          SECRETS_JSON: ${{ toJSON(secrets) }}
+        # No secret is set yet: installing runs other people's install scripts.
         run: |
           "$RUNNER_TEMP/tools/node_modules/.bin/tsx" "$RUNNER_TEMP/tools/src/cli/provider.ts" ci-install contributor.yml
-          # Export only the secret the adapter declares (ci.secret.name), for the next steps.
+
+      - name: Give the agent its login
+        env:
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+        # Export only the secret the adapter declares (ci.secret.name), for the next steps.
+        run: |
           "$RUNNER_TEMP/tools/node_modules/.bin/tsx" "$RUNNER_TEMP/tools/src/cli/provider.ts" ci-env contributor.yml
 
       - name: Keep the runner repository closed
@@ -59,6 +62,11 @@ jobs:
         run: gh api -X PUT "repos/${{ github.repository }}/interaction-limits" -f limit=collaborators_only -f expiry=six_months > /dev/null
 
       - name: Contribute
+        # Only this step holds the GitHub token, and only the runner uses it: the agent it
+        # launches gets a short list of variables without it, and runs a repository's commands
+        # in a sandbox with no network (see the provider's README).
+        env:
+          AGENTS_CONTRIBUTING_GITHUB_TOKEN: ${{ secrets.AGENTS_CONTRIBUTING_GITHUB_TOKEN }}
         run: |
           flags=""
           [ "${{ inputs.dry_run }}" = "true" ] && flags="$flags --dry-run"

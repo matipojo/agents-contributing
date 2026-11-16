@@ -13,8 +13,8 @@ targets:
   repos: []            # e.g. [owner/repo]
   topics: [agents-contributing]
 
-# Which help types you are willing to do.
-help_types: [reproduce, triage, tests, docs]
+# Which help types you are willing to do. The runner does audit, pr and review today.
+help_types: [audit, pr, review]
 
 # Surplus rules.
 budget:

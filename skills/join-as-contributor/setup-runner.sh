@@ -10,7 +10,7 @@ CONFIG="$HOME_DIR/contributor.yml"
 step() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 open_url() { echo "  $1"; (command -v open >/dev/null && open "$1") || (command -v xdg-open >/dev/null && xdg-open "$1") || true; }
 
-[ -f "$CONFIG" ] || { echo "No contributor config at $CONFIG. Ask your agent to finish steps 1 and 2 of the join skill first."; exit 1; }
+[ -f "$CONFIG" ] || { echo "No contributor config at $CONFIG. Write it from templates/contributor.yml first, with your provider."; exit 1; }
 command -v gh >/dev/null || { echo "Install the GitHub CLI first: https://cli.github.com"; exit 1; }
 
 step "1/5  GitHub login"

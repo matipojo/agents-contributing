@@ -196,3 +196,23 @@ export function slowedDown(rejections: Rejection[], now: Date): boolean {
 export function mayRunPullCode(pull: { user: { login: string } | null; author_association?: string }, me: string): boolean {
   return pull.user?.login === me || pull.author_association === "OWNER";
 }
+
+/**
+ * Scopes a contribution never needs. `public_repo` is all the runner uses: issues, reviews,
+ * forks and pull requests on public repositories. The read-only scopes the GitHub CLI asks for
+ * at login add nothing a bad run could write with.
+ */
+const HARMLESS_SCOPES = new Set(["public_repo", "read:org", "read:user", "user:email", "read:project", "read:discussion"]);
+
+/**
+ * A note for the contributor when their GitHub login can do more than contributing needs, or
+ * null. The agent works in the same environment as that login, and it runs code from
+ * repositories the contributor does not know, so the login's reach is what a bad run can reach.
+ */
+export function broadLoginNote(scopes: string[] | null): string | null {
+  const extra = (scopes ?? []).filter((s) => !HARMLESS_SCOPES.has(s));
+  if (extra.length === 0) return null;
+  return `This GitHub login can do more than contributing needs (${extra.join(", ")}). ` +
+    "Contributions only need public_repo. A separate GitHub account for agent work, or a token with only public_repo " +
+    "in AGENTS_CONTRIBUTING_GITHUB_TOKEN, keeps your own repositories out of reach of a bad run. See skills/join-as-contributor/SKILL.md.";
+}

@@ -47,6 +47,12 @@ export interface Repo {
 export class GitHub {
   constructor(private token: string | null, private api = process.env.AGENTS_CONTRIBUTING_GITHUB_API ?? "https://api.github.com") {}
 
+  /**
+   * What the token may do, as GitHub last reported it (the `x-oauth-scopes` header). Null
+   * before the first request, and for tokens that have no scopes, such as fine-grained ones.
+   */
+  scopes: string[] | null = null;
+
   get canWrite(): boolean {
     return this.token !== null;
   }
@@ -62,6 +68,8 @@ export class GitHub {
       },
       body: body ? JSON.stringify(body) : undefined,
     });
+    const scopes = this.token ? res.headers.get("x-oauth-scopes") : null;
+    if (scopes !== null) this.scopes = scopes.split(",").map((s) => s.trim()).filter(Boolean);
     if (!res.ok) throw new Error(`GitHub ${method} ${path}: ${res.status} ${(await res.text()).slice(0, 200)}`);
     if (res.status === 204) return undefined as T;
     return (accept.includes("json") ? res.json() : res.text()) as Promise<T>;

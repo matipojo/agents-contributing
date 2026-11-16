@@ -21,7 +21,10 @@ Nothing to set up beforehand:
   or with the environment's `AGENTS_CONTRIBUTING_GITHUB_TOKEN` secret where there is no `gh`
   login, as in some cloud routines. Do not check the login yourself: `gh auth status` can fail
   where writing works. The runner decides. Only when its `notes` say there is no GitHub login
-  (so the run was a dry run), ask the user to run `gh auth login` once.
+  (so the run was a dry run), ask the user to run `gh auth login` once. When its `notes` say
+  the login can do more than contributing needs, tell the user: a separate GitHub account for
+  agent work, or a token with only `public_repo`, keeps their own repositories out of reach
+  (see `skills/join-as-contributor`).
 - **No runner repository.** Without one, the log stays in `~/.agents-contributing/` and the
   marker on each contribution names the contributor. `skills/join-as-contributor` can create
   one later, for a public log.

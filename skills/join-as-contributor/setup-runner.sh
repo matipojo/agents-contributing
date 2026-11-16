@@ -43,14 +43,11 @@ put() { # put <path in repo> <local file>: create or update one file
 }
 put README.md "$TOOLS/templates/runner/README.md"
 put contributor.yml "$CONFIG"
-# The workflow runs exactly the tools this script comes from, by commit, never a branch.
-TOOLS_REF=$(git -C "$TOOLS" rev-parse HEAD 2>/dev/null) || { echo "  $TOOLS is not a git checkout, so the runner cannot be pinned to its commit."; exit 1; }
-[ -n "$(git -C "$TOOLS" branch -r --contains "$TOOLS_REF" 2>/dev/null)" ] || { echo "  The tools in $TOOLS are at a commit that is not on GitHub ($TOOLS_REF). Check out a published commit first."; exit 1; }
+# The workflow runs the tools at the commit this script comes from.
 WORKFLOW=$(mktemp)
-sed "s/__TOOLS_REF__/$TOOLS_REF/" "$TOOLS/templates/runner/.github/workflows/contribute.yml" > "$WORKFLOW"
+sed "s/__TOOLS_REF__/$(git -C "$TOOLS" rev-parse HEAD)/" "$TOOLS/templates/runner/.github/workflows/contribute.yml" > "$WORKFLOW"
 put .github/workflows/contribute.yml "$WORKFLOW"
 rm -f "$WORKFLOW"
-echo "  The runner is pinned to the tools at ${TOOLS_REF:0:12}. To update it later: git -C \"$TOOLS\" pull, then run this script again."
 gh api "repos/$REPO/contents/contributions.jsonl" >/dev/null 2>&1 || put contributions.jsonl /dev/null
 echo "  Done: closed to outside input, with your config, an empty log and a daily workflow."
 

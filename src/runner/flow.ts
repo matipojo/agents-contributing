@@ -9,7 +9,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { HOME, type ContributorConfig } from "../balance/config.ts";
 import { ADAPTERS } from "../balance/adapters/index.ts";
 import { decide, type Decision } from "../balance/decide.ts";
@@ -78,32 +77,6 @@ export interface TaskState {
 const git = (cwd: string, ...a: string[]) =>
   execFileSync("git", a, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
 
-/** After this many days the runner says its own code is old. It never updates itself. */
-export const STALE_DAYS = 60;
-
-/**
- * A note when the runner's code is old, or null. The runner stays at the commit the
- * contributor chose, so it must say when that commit is far behind: otherwise a fix to the
- * runner itself would never reach them.
- */
-export function staleNote(committedAt: Date | null, now: Date): string | null {
-  if (!committedAt) return null;
-  const days = Math.floor((now.getTime() - committedAt.getTime()) / (24 * 3_600_000));
-  if (days <= STALE_DAYS) return null;
-  return `The runner's code is ${days} days old. It stays at the commit you chose and never updates itself. ` +
-    'To look at what changed and update: skills/contribute/SKILL.md, "Update the runner".';
-}
-
-/** When the runner's own code was committed, or null when it does not run from a git checkout. */
-function ownCommitDate(): Date | null {
-  try {
-    const seconds = Number(git(fileURLToPath(new URL("../..", import.meta.url)), "log", "-1", "--format=%ct").trim());
-    return Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000) : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Checks the balance and the runner repository. Returns why not to contribute, or null. */
 export async function setup(
   cfg: ContributorConfig, token: string | null, flags: { dryRun: boolean; force: boolean },
@@ -114,8 +87,6 @@ export async function setup(
   const notes: string[] = [];
   const gh = new GitHub(token);
   if (!token) notes.push("No GitHub login (run `gh auth login` once), so this is a dry run: nothing is written to GitHub.");
-  const stale = staleNote(ownCommitDate(), new Date());
-  if (stale) notes.push(stale);
 
   // Only donate what the balance check allows.
   const now = new Date();

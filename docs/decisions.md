@@ -44,7 +44,7 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 25. We decided to limit network egress to the AI provider and GitHub, and to sandbox shell commands, because then even a successful injection cannot send the token out.
 26. We decided the runner uses a narrowly scoped GitHub token: public repositories, pull requests and comments only, because a compromised runner then does limited damage. (Superseded by 62.)
 27. We decided runners update automatically only to signed releases, and only 72 hours after release, because that gives time to catch a malicious release.
-71. We decided a runner runs the tools at one commit, the one the contributor joined or last updated at, in the routine's prompt and in the workflow's `TOOLS_REF`, that the workflow's actions are pinned to commits too, and that the runner only says when its code is over 60 days old, because the tools run next to the contributor's logins, a branch can change under them, and there are no signed releases yet for 27 to follow. Until there are, updating is the contributor's decision.
+71. We decided a runner runs the tools at one commit, written in the routine's prompt and in the workflow, and updates only when the contributor asks, because the tools run next to the contributor's logins, a branch can change under them, and there are no signed releases yet for 27.
 
 ## Runner repositories
 

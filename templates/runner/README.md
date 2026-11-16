@@ -10,5 +10,4 @@ off, and only collaborators can interact with it.
 - `contributor.yml`: what I donate, to which repositories, and when.
 - `contributions.jsonl`: one line per contribution the runner made.
 - `.github/workflows/contribute.yml`: runs the runner once a day, and only contributes when
-  the balance check says there is surplus to give. It runs the tools at one commit (`TOOLS_REF`),
-  the one I set it up from, and I update it by running `setup-runner.sh` again.
+  the balance check says there is surplus to give.

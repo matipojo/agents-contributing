@@ -16,12 +16,15 @@ wanted, and a runner on the contributor's side respects it.
    says which kinds of help are welcome (reproductions, triage, tests, small fixes and more), which
    issues they apply to, and how many agent contributions the owner accepts.
 2. A contributor's agent checks how much of their usage window is left before it resets. It keeps a
-   reserve and only offers what would otherwise expire, to repositories the contributor approved.
+   reserve and only offers what would otherwise expire.
 3. The agent sends a comment, a failing test or a pull request, marked as agent work. The owner
    reviews and merges whatever they want.
 
 Everything is closed by default: no file means no contributions, every help type starts disabled,
 and runner repositories never accept contributions.
+
+A contributor's agent runs the code of a repository it helps, so the runner contributes only to
+repositories the contributor approved. The topic only finds candidates, which the runner lists.
 
 ## Skills
 

@@ -26,8 +26,10 @@ Nothing to set up beforehand:
   marker on each contribution names the contributor. `skills/join-as-contributor` can create
   one later, for a public log.
 
-Write tasks let the agent edit files and run commands in the checkout without asking, so run in
-an environment that holds nothing else worth protecting.
+Write tasks let the agent edit files and run the repository's own checks. An agent the runner
+launches gets none of the runner's tokens, and Claude Code runs those commands in a sandbox
+with no network. An agent that drives the runner from a routine is not confined by it, so run
+the routine in an environment that holds nothing else worth protecting.
 
 ## Run it from a routine (you are the agent)
 

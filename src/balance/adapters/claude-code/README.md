@@ -38,3 +38,11 @@ The runner repository's workflow installs Claude Code and runs it with
 `CLAUDE_CODE_OAUTH_TOKEN`, a long-lived token for the subscription that `claude setup-token`
 creates (`setup-runner.sh` asks for it). It lasts about a year; run the setup again to renew it.
 Runs there have no session transcript, so there is no `spentUsd`; credit pools do not apply to them.
+
+## How the runner launches it
+
+`claude -p --restricted` in the checkout, without the runner's environment. A read-only task
+gets only `Read`, `Grep` and `Glob`. A write task also gets `Edit`, `Write` and `Bash`, and its
+commands run in Claude Code's sandbox: no network, writes only in the checkout, no
+subscription token, no login files. The run fails if the sandbox cannot start. On Linux it
+needs `bubblewrap` and `socat`, which the workflow installs.

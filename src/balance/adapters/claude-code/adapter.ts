@@ -120,7 +120,9 @@ export const claudeCode: Adapter = {
   detect: (env) => env.CLAUDECODE === "1",
   processNames: ["claude"],
   ci: {
-    install: "npm install --global --silent @anthropic-ai/claude-code",
+    // bubblewrap and socat run Claude Code's command sandbox; Ubuntu 24.04 also needs the sysctl.
+    install: "npm install --global --silent @anthropic-ai/claude-code && sudo apt-get install --yes --quiet bubblewrap socat > /dev/null" +
+      " && (sudo sysctl --quiet --write kernel.apparmor_restrict_unprivileged_userns=0 || true)",
     secret: {
       name: "CLAUDE_CODE_OAUTH_TOKEN",
       command: "claude setup-token",

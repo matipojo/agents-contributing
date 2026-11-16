@@ -42,6 +42,7 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 23. We decided the subscription is connected through the provider's long-lived token stored as a secret, because the run then uses the surplus without an API key. (Superseded by 61.)
 24. We decided everything the runner reads from another repository, including `AGENTS-CONTRIBUTING.md` itself, is data and not instructions, because a malicious owner or issue author can plant prompt injection.
 25. We decided to limit network egress to the AI provider and GitHub, and to sandbox shell commands, because then even a successful injection cannot send the token out.
+68. We decided an agent the runner launches gets only harmless environment variables and its provider's, and that Claude Code runs a repository's commands only in its sandbox and fails without one, because a fix task runs the target repository's checks, which must find neither a token nor a network. This enforces 25 for launched agents.
 26. We decided the runner uses a narrowly scoped GitHub token: public repositories, pull requests and comments only, because a compromised runner then does limited damage. (Superseded by 62.)
 27. We decided runners update automatically only to signed releases, and only 72 hours after release, because that gives time to catch a malicious release.
 

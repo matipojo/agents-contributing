@@ -35,9 +35,9 @@ Use this when you are already running on a schedule, for example a Claude Code r
 Cursor automation or a Codex automation. Your provider keeps you signed in, so the runner never
 launches an agent: it hands you the task and checks your work.
 
-1. Get the tools, if they are not there yet:
+1. Install the tools, which the routine's prompt put at its commit. Never move them to a
+   newer commit during a run:
    ```bash
-   [ -d ~/.agents-contributing/tools ] || git clone --depth 1 https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools
    npm --prefix ~/.agents-contributing/tools ci --silent
    ```
 2. Ask for a task:
@@ -57,10 +57,16 @@ launches an agent: it hands you the task and checks your work.
    anything yourself, and never retry a rejected change by another route.
 5. Go back to step 2, until `next` exits with `10`.
 
-The routine's prompt, the same for every provider:
+The routine's prompt, the same for every provider, with one full commit id in place of both
+`<commit>`:
 
-> Follow `skills/contribute/SKILL.md` from https://github.com/matipojo/agents-contributing,
-> section "Run it from a routine".
+> Run `git clone -q https://github.com/matipojo/agents-contributing ~/.agents-contributing/tools 2>/dev/null; git -C ~/.agents-contributing/tools fetch -q origin <commit> && git -C ~/.agents-contributing/tools checkout -q --detach <commit>`.
+> Then follow `~/.agents-contributing/tools/skills/contribute/SKILL.md`, section "Run it from a routine".
+
+To update, when the contributor asks: show them
+`git -C ~/.agents-contributing/tools log --oneline HEAD..origin/main` after a fetch, and when
+they agree, put the new commit in the prompt. For a runner repository, they run
+`setup-runner.sh` again.
 
 The routine needs network access to github.com.
 

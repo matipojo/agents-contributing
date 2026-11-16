@@ -29,6 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
+      # The commit of the tools this runner runs, never a branch. setup-runner.sh writes it;
+      # run it again to update.
+      TOOLS_REF: "__TOOLS_REF__"
       AGENTS_CONTRIBUTING_HOME: ${{ github.workspace }}
       AGENTS_CONTRIBUTING_GITHUB_TOKEN: ${{ secrets.AGENTS_CONTRIBUTING_GITHUB_TOKEN }}
     steps:
@@ -40,7 +43,10 @@ jobs:
 
       - name: Get the tools
         run: |
-          git clone --quiet --depth 1 https://github.com/matipojo/agents-contributing "$RUNNER_TEMP/tools"
+          echo "$TOOLS_REF" | grep -Eq '^[0-9a-f]{40}$' || { echo "TOOLS_REF must be a full commit id. Run setup-runner.sh again."; exit 1; }
+          git init --quiet "$RUNNER_TEMP/tools"
+          git -C "$RUNNER_TEMP/tools" fetch --quiet --depth 1 https://github.com/matipojo/agents-contributing "$TOOLS_REF"
+          git -C "$RUNNER_TEMP/tools" checkout --quiet --detach FETCH_HEAD
           npm --prefix "$RUNNER_TEMP/tools" ci --silent
 
       - name: Install the agent

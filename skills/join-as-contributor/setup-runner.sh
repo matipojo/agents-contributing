@@ -43,7 +43,11 @@ put() { # put <path in repo> <local file>: create or update one file
 }
 put README.md "$TOOLS/templates/runner/README.md"
 put contributor.yml "$CONFIG"
-put .github/workflows/contribute.yml "$TOOLS/templates/runner/.github/workflows/contribute.yml"
+# The workflow runs the tools at the commit this script comes from.
+WORKFLOW=$(mktemp)
+sed "s/__TOOLS_REF__/$(git -C "$TOOLS" rev-parse HEAD)/" "$TOOLS/templates/runner/.github/workflows/contribute.yml" > "$WORKFLOW"
+put .github/workflows/contribute.yml "$WORKFLOW"
+rm -f "$WORKFLOW"
 gh api "repos/$REPO/contents/contributions.jsonl" >/dev/null 2>&1 || put contributions.jsonl /dev/null
 echo "  Done: closed to outside input, with your config, an empty log and a daily workflow."
 

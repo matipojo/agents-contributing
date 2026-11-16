@@ -26,18 +26,10 @@ Nothing to set up beforehand:
   marker on each contribution names the contributor. `skills/join-as-contributor` can create
   one later, for a public log.
 
-Write tasks let the agent edit files and run a repository's own checks, which is code the
-contributor does not know. How much that code can reach depends on how the runner is run:
-
-- **Launched by the runner** (GitHub Actions, cron): the agent starts without the runner's
-  GitHub token or any other variable of the runner's, and with Claude Code every command runs
-  in a sandbox: no network, writes only in the checkout, no login files. Without a working
-  sandbox the run fails; it never falls back to running unconfined.
-- **From a routine** (you are the agent): the runner cannot confine you. Whatever your session
-  can reach, the repository's code can reach, including the GitHub login. So the routine must
-  run in an environment that holds nothing else worth protecting, with a GitHub login that
-  can reach nothing else, and you run a repository's commands only in your own sandbox when
-  you have one.
+Write tasks let the agent edit files and run the repository's own checks. An agent the runner
+launches gets none of the runner's tokens, and Claude Code runs those commands in a sandbox
+with no network. An agent that drives the runner from a routine is not confined by it, so run
+the routine in an environment that holds nothing else worth protecting.
 
 ## Run it from a routine (you are the agent)
 

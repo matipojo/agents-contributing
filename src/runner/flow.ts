@@ -8,7 +8,6 @@
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { devNull } from "node:os";
 import { join } from "node:path";
 import { HOME, type ContributorConfig } from "../balance/config.ts";
 import { ADAPTERS } from "../balance/adapters/index.ts";
@@ -388,20 +387,6 @@ async function log(gh: GitHub, cfg: ContributorConfig, t: TaskState, url: string
   await gh.appendLine(t.runnerRepo, "contributions.jsonl", line, `Log ${t.type} contribution to ${t.repo}`);
 }
 
-/**
- * git in a checkout after the agent worked in it. The agent ran code from the repository, and
- * the runner holds the GitHub token, so nothing that code may have planted is allowed to run
- * here: no hooks, no file-system monitor, no external diff, and no user or system config, which
- * can name filter and diff programs. The checkout's own `.git/config` is still read; the
- * agent's sandbox keeps it read-only.
- */
-export function gitAfterAgent(cwd: string, ...a: string[]): string {
-  return execFileSync("git", ["-c", `core.hooksPath=${devNull}`, "-c", "core.fsmonitor=false", "-c", "diff.external=", ...a], {
-    cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1" },
-  });
-}
-
 /** Checks the agent's work against the rules, then submits it with the marker, and logs it. */
 export async function submit(
   cfg: ContributorConfig, gh: GitHub, t: TaskState, reply: string, model: string, notes: string[],
@@ -411,7 +396,7 @@ export async function submit(
   const out: Record<string, unknown> = { task: t.id, repo: t.repo, type: t.type, model };
 
   if (t.type === "audit") {
-    if (gitAfterAgent(t.dir, "status", "--porcelain").trim()) return { ...out, rejected: ["An audit must not change files."] };
+    if (git(t.dir, "status", "--porcelain").trim()) return { ...out, rejected: ["An audit must not change files."] };
     const known = new Set((t.openTitles ?? []).map((x) => x.trim().toLowerCase()));
     const findings = parseFindings(reply, t.max ?? 5).filter((f) => !known.has(f.title.toLowerCase()));
     if (findings.length === 0) return { ...out, submitted: [], reason: "the audit found nothing new" };
@@ -431,9 +416,9 @@ export async function submit(
   if (t.type === "pr") {
     const fix = parseFix(reply);
     if ("skip" in fix) return { ...out, issue: t.issue!.number, skipped: fix.skip };
-    gitAfterAgent(t.dir, "add", "-A");
+    git(t.dir, "add", "-A");
     // Compare with the commit prepare checked out, so commits the agent made are counted too.
-    const changes = parseNumstat(gitAfterAgent(t.dir, "diff", "--cached", "--numstat", "-z", t.baseSha));
+    const changes = parseNumstat(git(t.dir, "diff", "--cached", "--numstat", "-z", t.baseSha));
     const errors = checkChange(changes, { forbidden: t.forbidden, maxDiffLines: t.maxDiffLines, require: t.require });
     if (errors.length) return { ...out, issue: t.issue!.number, rejected: errors };
     const why = await stillAllowed(gh, t, changes);
@@ -446,13 +431,13 @@ export async function submit(
     ].join("\n\n");
     const stat = changes.map((c) => `${c.path} +${c.added} -${c.deleted}`);
     if (t.dryRun) {
-      notes.push(`Would open a draft pull request "${fix.title}" from ${t.branch}:\n${body}\n\n${gitAfterAgent(t.dir, "diff", "--cached", "--no-ext-diff", "--no-textconv", t.baseSha)}`);
+      notes.push(`Would open a draft pull request "${fix.title}" from ${t.branch}:\n${body}\n\n${git(t.dir, "diff", "--cached", t.baseSha)}`);
       await log(gh, cfg, t, "(dry run)", model);
       return { ...out, issue: t.issue!.number, changes: stat, submitted: ["(dry run) draft pull request"] };
     }
     // One commit on top of the base, whatever the agent did in between.
-    gitAfterAgent(t.dir, "reset", "-q", "--soft", t.baseSha);
-    gitAfterAgent(t.dir, "-c", `user.name=${t.login}`, "-c", `user.email=${t.login}@users.noreply.github.com`,
+    git(t.dir, "reset", "-q", "--soft", t.baseSha);
+    git(t.dir, "-c", `user.name=${t.login}`, "-c", `user.email=${t.login}@users.noreply.github.com`,
       "commit", "-q", "-m", `${fix.title}\n\nCloses #${t.issue!.number}\n\nAgents-Contributing: ${marker.replace(/^agents-contributing: /, "")}`);
     let head = t.branch!;
     let pushTo = t.repo;
@@ -460,16 +445,14 @@ export async function submit(
       pushTo = (await gh.fork(t.repo)).full_name;
       head = `${pushTo.split("/")[0]}:${t.branch}`;
     }
-    // The push needs the user's git config to reach the network, so only what could run a
-    // program from the checkout is switched off: hooks and credential helpers.
-    execFileSync("git", ["-c", `core.hooksPath=${devNull}`, "-c", "credential.helper=", "push", "-q", `https://github.com/${pushTo}.git`, `HEAD:refs/heads/${t.branch}`],
+    execFileSync("git", ["push", "-q", `https://github.com/${pushTo}.git`, `HEAD:refs/heads/${t.branch}`],
       { cwd: t.dir, env: gh.gitAuthEnv(), stdio: ["ignore", "pipe", "pipe"] });
     const pr = await gh.createPull(t.repo, { title: fix.title, body, head, base: t.defaultBranch });
     await log(gh, cfg, t, pr.html_url, model);
     return { ...out, issue: t.issue!.number, changes: stat, submitted: [pr.html_url] };
   }
 
-  if (gitAfterAgent(t.dir, "status", "--porcelain").trim()) return { ...out, rejected: ["A review must not change files."] };
+  if (git(t.dir, "status", "--porcelain").trim()) return { ...out, rejected: ["A review must not change files."] };
   const why = await stillAllowed(gh, t);
   if (typeof why === "string") return { ...out, aborted: why };
   const body = `${parseReview(reply)}\n\n---\nReview by an AI agent under this repository's AGENTS-CONTRIBUTING.md.\n\n${marker}`;

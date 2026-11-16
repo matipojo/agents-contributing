@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+// An adapter and its agent import each other, and only loading the adapter first works.
+import "../src/balance/adapters/index.ts";
 
 test("a launched agent gets none of the runner's secrets in its environment", async () => {
   const { agentEnv } = await import("../src/balance/adapters/agent-env.ts");

@@ -23,9 +23,6 @@ wanted, and a runner on the contributor's side respects it.
 Everything is closed by default: no file means no contributions, every help type starts disabled,
 and runner repositories never accept contributions.
 
-A contributor's agent runs the code of a repository it helps, so the runner contributes only to
-repositories the contributor approved. The topic only finds candidates, which the runner lists.
-
 ## Skills
 
 Point your agent at one of these:

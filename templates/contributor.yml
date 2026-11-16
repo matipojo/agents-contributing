@@ -7,15 +7,12 @@ version: 1
 # Known adapters: claude-code, codex, cursor, declared
 provider: claude-code
 
-# Which repositories you are willing to contribute to.
-# Your agent runs the code of a repository it contributes to, so only the repositories you
-# approve in `repos` get contributions. A repo must ALSO have AGENTS-CONTRIBUTING.md.
-# `topics` only find more: the runner lists them for you, and each waits until you approve it
-# (`run.ts approve owner/name`, which adds it to `repos`).
+# Which repositories you are willing to contribute to. Your agent runs their code, so only
+# the ones you list in `repos` get contributions. `topics` only find candidates, which the
+# runner reports. A repo must ALSO have AGENTS-CONTRIBUTING.md.
 targets:
-  repos: [matipojo/agents-contributing]   # the project's own repository, whose code you already run
+  repos: []            # e.g. [owner/repo]
   topics: [agents-contributing]
-  auto_approve: false   # true: contribute to anything a topic finds, without asking. Not recommended.
 
 # Which help types you are willing to do.
 help_types: [reproduce, triage, tests, docs]

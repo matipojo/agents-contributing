@@ -7,11 +7,7 @@ import { detectAdapter } from "./adapters/index.ts";
 export interface ContributorConfig {
   version: number;
   provider: string;
-  /**
-   * `repos` are the repositories the contributor approved: the only ones contributed to.
-   * `topics` find more, which are reported and wait for approval, unless `auto_approve`.
-   */
-  targets: { repos: string[]; topics: string[]; auto_approve?: boolean };
+  targets: { repos: string[]; topics: string[] };
   help_types: string[];
   budget: {
     window: string;         // "" means the provider's own (seven_day for most, monthly for Cursor)
@@ -36,27 +32,10 @@ export interface ContributorConfig {
 export const HOME = process.env.AGENTS_CONTRIBUTING_HOME ?? join(homedir(), ".agents-contributing");
 export const DEFAULT_CONFIG_PATH = join(HOME, "contributor.yml");
 
-/** Where the runner itself comes from. */
-export const HOME_REPO = "matipojo/agents-contributing";
-const REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/;
-
-/** True for `owner/name`, as GitHub writes it. */
-export const isRepoName = (name: unknown): name is string => typeof name === "string" && REPO_NAME.test(name);
-
-/**
- * Repositories approved in the environment: AGENTS_CONTRIBUTING_REPOS, separated by commas or
- * spaces. For a cloud routine, where no config file survives between runs.
- */
-export function approvedInEnv(env: NodeJS.ProcessEnv = process.env): string[] {
-  return (env.AGENTS_CONTRIBUTING_REPOS ?? "").split(/[\s,]+/).filter(Boolean);
-}
-
 const DEFAULTS: ContributorConfig = {
   version: 1,
   provider: "declared",
-  // The project's own repository is approved from the start: the contributor already runs its
-  // code, as the runner. Everything else found by topic waits for them.
-  targets: { repos: [HOME_REPO], topics: ["agents-contributing"], auto_approve: false },
+  targets: { repos: [], topics: ["agents-contributing"] },
   help_types: ["audit", "pr", "review", "reproduce", "triage", "tests", "docs"],
   budget: { window: "", lead_hours: 24, margin_pct: 10, donate_fraction: 1, min_surplus_pct: 5 },
   donate: ["subscription", "credits"],
@@ -87,13 +66,9 @@ export function loadConfig(path = DEFAULT_CONFIG_PATH): ContributorConfig {
     credits: { ...DEFAULTS.credits, ...raw.credits },
     declared: { ...DEFAULTS.declared, ...raw.declared },
   };
-  const t = cfg.targets;
-  if (!Array.isArray(t.repos) || !Array.isArray(t.topics)) throw new Error("targets.repos and targets.topics must be lists");
-  if (t.auto_approve !== undefined && typeof t.auto_approve !== "boolean") throw new Error("targets.auto_approve must be true or false");
-  t.repos = [...new Set([...t.repos, ...approvedInEnv()])];
-  for (const name of t.repos) {
-    if (!isRepoName(name)) throw new Error(`targets.repos: "${name}" is not a repository name (owner/name)`);
-  }
+  // A cloud routine keeps no config file between runs, so it approves repositories here.
+  const fromEnv = (process.env.AGENTS_CONTRIBUTING_REPOS ?? "").split(/[\s,]+/).filter(Boolean);
+  cfg.targets.repos = [...new Set([...cfg.targets.repos, ...fromEnv])];
   for (const d of cfg.donate) {
     if (d !== "subscription" && d !== "credits") throw new Error(`donate may only list subscription and credits, got "${d}"`);
   }

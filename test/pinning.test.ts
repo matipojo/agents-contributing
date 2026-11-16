@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 test("the runner says when its own code is old, since it never updates itself", async () => {
-  const { staleNote, STALE_DAYS } = await import("../src/runner/policy.ts");
+  const { staleNote, STALE_DAYS } = await import("../src/runner/flow.ts");
   const at = new Date("2026-10-29T12:00:00Z");
   const daysAgo = (d: number) => new Date(at.getTime() - d * 24 * 3_600_000);
   assert.equal(staleNote(null, at), null, "not a git checkout: nothing to say");

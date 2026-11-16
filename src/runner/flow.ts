@@ -18,7 +18,7 @@ import {
 } from "../spec.ts";
 import { GitHub, type Issue, type Repo } from "./github.ts";
 import {
-  allowance, checkChange, markerType, mayRunPullCode, parseNumstat, rejectionPause, rejectionsOf, slowedDown, staleNote,
+  allowance, checkChange, markerType, mayRunPullCode, parseNumstat, rejectionPause, rejectionsOf, slowedDown,
   type Change, type Contribution, type Rejection,
 } from "./policy.ts";
 import {
@@ -77,6 +77,22 @@ export interface TaskState {
 
 const git = (cwd: string, ...a: string[]) =>
   execFileSync("git", a, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
+
+/** After this many days the runner says its own code is old. It never updates itself. */
+export const STALE_DAYS = 60;
+
+/**
+ * A note when the runner's code is old, or null. The runner stays at the commit the
+ * contributor chose, so it must say when that commit is far behind: otherwise a fix to the
+ * runner itself would never reach them.
+ */
+export function staleNote(committedAt: Date | null, now: Date): string | null {
+  if (!committedAt) return null;
+  const days = Math.floor((now.getTime() - committedAt.getTime()) / (24 * 3_600_000));
+  if (days <= STALE_DAYS) return null;
+  return `The runner's code is ${days} days old. It stays at the commit you chose and never updates itself. ` +
+    'To look at what changed and update: skills/contribute/SKILL.md, "Update the runner".';
+}
 
 /** When the runner's own code was committed, or null when it does not run from a git checkout. */
 function ownCommitDate(): Date | null {

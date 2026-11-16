@@ -29,6 +29,11 @@ installed.
 
 ### 1. Make sure GitHub is logged in
 
+First recommend a separate GitHub account for agent work, and let the user choose. The agent
+runs code from repositories they do not know, next to the GitHub login, so a bad run can write
+wherever that login can. GitHub's terms allow one machine account next to a personal one. With
+one, log it in here (or use its token in step 2) instead of the user's own.
+
 Run `gh auth token > /dev/null`. If it fails, `gh` has no login: ask the user to run
 `gh auth login` once, in their terminal, and wait. That is the only login: the agent's own
 provider is already signed in. (Do not use `gh auth status`: it can fail where writing works.)

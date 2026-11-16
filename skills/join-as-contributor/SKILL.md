@@ -29,20 +29,10 @@ installed.
 
 ### 1. Make sure GitHub is logged in
 
-**Recommend a separate GitHub account for agent work first.** The agent runs code from
-repositories the user does not know, in the same environment as the GitHub login. With the
-user's own login, a bad run can write to every repository that login can. With a separate
-account, it can reach nothing of theirs. Say this in one or two sentences and let them choose:
-
-- GitHub's terms allow one machine account next to a personal one, used only to run a machine.
-  A name such as `<their-login>-agent`, with a profile line that says who runs it.
-- Contributions, the marker's `from=` and the log then carry that account's name.
-- Log that account in where the routine runs (`gh auth login`), or make its `public_repo`
-  token and store it as the `AGENTS_CONTRIBUTING_GITHUB_TOKEN` secret (step 2).
-
-If they prefer their own account, continue. Then the isolated environment in "Before you
-start" is the only thing between a bad run and their repositories, so do not skip it. The
-runner's `notes` say when a login can do more than contributing needs; pass that on.
+First recommend a separate GitHub account for agent work, and let the user choose. The agent
+runs code from repositories they do not know, next to the GitHub login, so a bad run can write
+wherever that login can. GitHub's terms allow one machine account next to a personal one. With
+one, log it in here (or use its token in step 2) instead of the user's own.
 
 Run `gh auth token > /dev/null`. If it fails, `gh` has no login: ask the user to run
 `gh auth login` once, in their terminal, and wait. That is the only login: the agent's own

@@ -56,7 +56,7 @@ personas (maintainers, contributors, security, legal, data and spam researchers)
 31. We decided every contribution carries a marker with provider, model and runner version, because the owner deserves to know what they are merging.
 32. We decided to check with each provider whether running a subscription on other people's repositories is allowed, because subscriptions are meant for personal use.
 33. We decided to verify open bugs in long-lived subscription tokens before relying on them, because some sessions have been reported not to recognize the plan.
-70. We decided to recommend a separate GitHub account for agent work, and to have the runner say when a login can do more than `public_repo`, without requiring either, because the agent runs unknown repositories' code next to that login, so the login's reach is what a bad run can reach, while a required extra account is a step people would not take (see 62).
+70. We decided to recommend a separate GitHub account for agent work without requiring it, because the agent runs unknown repositories' code next to the login, and a required account is a step people would not take (see 62).
 
 ## Finding contributions
 

@@ -17,7 +17,7 @@ import {
 } from "../spec.ts";
 import { GitHub, type Issue, type Repo } from "./github.ts";
 import {
-  allowance, broadLoginNote, checkChange, markerType, mayRunPullCode, parseNumstat, rejectionPause, rejectionsOf, slowedDown,
+  allowance, checkChange, markerType, mayRunPullCode, parseNumstat, rejectionPause, rejectionsOf, slowedDown,
   type Change, type Contribution, type Rejection,
 } from "./policy.ts";
 import {
@@ -100,8 +100,6 @@ export async function setup(
   // Contributing without the runner repository is not allowed: every contribution is logged there.
   const login = token ? await gh.login() : process.env.AGENTS_CONTRIBUTING_GITHUB_LOGIN ?? null;
   if (!login) throw new Error("Unknown GitHub login. Run `gh auth login` once (or set AGENTS_CONTRIBUTING_GITHUB_LOGIN for a dry run).");
-  const broad = broadLoginNote(gh.scopes);
-  if (broad) notes.push(broad);
   // The runner repository is optional. With it, the log is public there; without it, the log
   // stays on this machine and the marker on each contribution still names the contributor.
   const wanted = cfg.runner_repo ?? `${login}/agents-contributing-runner`;

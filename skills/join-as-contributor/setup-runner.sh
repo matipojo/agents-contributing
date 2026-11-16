@@ -23,9 +23,7 @@ elif ! gh auth status 2>&1 | grep -q "workflow"; then
 fi
 ME=$(gh api user --jq .login)
 REPO="$ME/agents-contributing-runner"
-echo "  Logged in as $ME. The runner repository and every contribution will carry this name."
-echo "  A separate GitHub account for agent work keeps your own repositories out of a bad run's reach."
-echo "  To use one, stop here (Ctrl-C), run 'gh auth switch' or 'gh auth login' as that account, and start again."
+echo "  Logged in as $ME."
 
 step "2/5  The runner repository: $REPO"
 if gh api "repos/$REPO" >/dev/null 2>&1; then
@@ -52,7 +50,6 @@ echo "  Done: closed to outside input, with your config, an empty log and a dail
 step "3/5  A GitHub token for the runner"
 URL="https://github.com/settings/tokens/new?scopes=public_repo&description=agents-contributing-runner"
 echo "Your browser opens a page with everything filled in: only public repositories."
-echo "Make it while signed in to GitHub as $ME in the browser: the token acts as whoever creates it."
 echo "Set an expiration you like, click 'Generate token', and copy it."
 open_url "$URL"
 read -r -s -p "  Paste the token here (it is not shown): " TOKEN; echo

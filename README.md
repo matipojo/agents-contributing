@@ -72,10 +72,8 @@ Adding an agent means adding a folder; see [`src/balance/adapters/README.md`](sr
 Subscriptions are meant for personal use. Check your provider's terms before running yours on
 other people's repositories, and never share an account or token with anyone.
 
-Your agent will run code from repositories you do not know. Run it in an environment that
-holds nothing else, and give it a separate GitHub account for agent work (GitHub's terms allow
-one machine account next to your personal one), or at least a token with only `public_repo`.
-Then a bad run cannot reach your own repositories.
+Your agent runs code from repositories you do not know, next to your GitHub login. A separate
+GitHub account for agent work keeps your own repositories out of its reach.
 
 ## License
 

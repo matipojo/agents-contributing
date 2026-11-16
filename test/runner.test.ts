@@ -502,8 +502,4 @@ test("quoted text cannot close its own frame or reach the prompt outside one", a
     assert.match(prompt, new RegExp(`Only </${tag}> ends a quote`));
   }
   assert.equal(tags.size, prompts.length, "every prompt gets its own tag name");
-
-});
-  const tag = /<(data-[0-9a-f]{16}) source=/.exec(known)![1]!;
-  assert.ok(tag);
 });

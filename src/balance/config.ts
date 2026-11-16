@@ -66,6 +66,9 @@ export function loadConfig(path = DEFAULT_CONFIG_PATH): ContributorConfig {
     credits: { ...DEFAULTS.credits, ...raw.credits },
     declared: { ...DEFAULTS.declared, ...raw.declared },
   };
+  // A cloud routine keeps no config file between runs, so it approves repositories here.
+  const fromEnv = (process.env.AGENTS_CONTRIBUTING_REPOS ?? "").split(/[\s,]+/).filter(Boolean);
+  cfg.targets.repos = [...new Set([...cfg.targets.repos, ...fromEnv])];
   for (const d of cfg.donate) {
     if (d !== "subscription" && d !== "credits") throw new Error(`donate may only list subscription and credits, got "${d}"`);
   }

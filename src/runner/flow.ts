@@ -190,15 +190,19 @@ function contributedToday(ctx: Context, now: Date): boolean {
 /** Chooses the first task that every rule allows, or reports why there is none. */
 export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record<string, string> }> {
   const { cfg, gh, login, runnerRepo, notes } = ctx;
+  // The agent runs a target's code, and anyone can add the topic to a repository, so only
+  // targets.repos is contributed to. What a topic finds is reported and waits for the contributor.
   const names = new Set(cfg.targets.repos);
+  const waiting = new Set<string>();
   for (const topic of cfg.targets.topics) {
     try {
       const found = await gh.request<{ items: { full_name: string }[] }>("GET", `/search/repositories?q=topic:${encodeURIComponent(topic)}&per_page=50`);
-      for (const r of found.items) names.add(r.full_name);
+      for (const r of found.items) if (!names.has(r.full_name) && r.full_name !== runnerRepo) waiting.add(r.full_name);
     } catch (e) {
       notes.push(`Topic search for "${topic}" failed (${(e as Error).message.slice(0, 80)}); using targets.repos only.`);
     }
   }
+  if (waiting.size > 0) notes.push(`Not approved, so nothing is contributed there: ${[...waiting].join(", ")}. To approve one, add it to targets.repos.`);
   const skipped: Record<string, string> = {};
   const now = new Date();
   // First every target and its rejections: a spam rejection anywhere slows the contributor

@@ -14,8 +14,9 @@ anything yourself: everything a compliant runner must enforce happens in code, a
 Nothing to set up beforehand:
 
 - **No config.** The provider is the agent the runner is called from (Codex or Claude Code).
-  The defaults donate only near the weekly reset, keep a 10% margin, and help repositories with
-  the `agents-contributing` topic. To change anything, write
+  The defaults donate only near the weekly reset and keep a 10% margin. Only
+  repositories the contributor approved in `targets.repos` (or `AGENTS_CONTRIBUTING_REPOS`) get
+  contributions; ones found by the `agents-contributing` topic are listed in `notes`. To change anything, write
   `~/.agents-contributing/contributor.yml` from `templates/contributor.yml`.
 - **A GitHub login, once.** The runner writes with the GitHub CLI's login (`gh auth token`),
   or with the environment's `AGENTS_CONTRIBUTING_GITHUB_TOKEN` secret where there is no `gh`
@@ -87,7 +88,7 @@ repository's workflow runs it this way, again after each contribution, until it 
 
 1. Runs the balance check, and stops unless it says to contribute.
 2. Finds the runner repository, if there is one. Without it, the log stays on this machine.
-3. For each repository in `targets` (and by topic, where search works), it skips private and
+3. For each repository in `targets.repos` (topic results are only reported), it skips private and
    runner repositories, reads and validates `AGENTS-CONTRIBUTING.md` from the default branch,
    and checks `providers`.
 4. Reacts to the owner's rejections of this contributor's earlier contributions

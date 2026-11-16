@@ -55,6 +55,11 @@ the chat.
 Run the routine's work once now, with `--dry-run --force` on `next`, and show the user what it
 would contribute. Nothing is written to GitHub.
 
+The runner contributes only to repositories in `targets.repos`. Its `notes` list the
+repositories that ask for help and are not there. Ask the user which ones to approve, and add
+only those: to `targets.repos` in `~/.agents-contributing/contributor.yml`, or for a cloud
+routine to its environment's `AGENTS_CONTRIBUTING_REPOS` variable, separated by commas.
+
 ### 4. Only if the user wants them
 
 - **Their own choices** (which repositories, which help types, how much to give): write

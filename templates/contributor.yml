@@ -7,8 +7,9 @@ version: 1
 # Known adapters: claude-code, codex, cursor, declared
 provider: claude-code
 
-# Which repositories you are willing to contribute to.
-# Use exact repos and/or topics. A repo must ALSO have AGENTS-CONTRIBUTING.md.
+# Which repositories you are willing to contribute to. Your agent runs their code, so only
+# the ones you list in `repos` get contributions. `topics` only find candidates, which the
+# runner reports. A repo must ALSO have AGENTS-CONTRIBUTING.md.
 targets:
   repos: []            # e.g. [owner/repo]
   topics: [agents-contributing]

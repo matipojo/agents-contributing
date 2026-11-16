@@ -78,20 +78,6 @@ export interface TaskState {
 const git = (cwd: string, ...a: string[]) =>
   execFileSync("git", a, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
 
-/**
- * git in a checkout after the agent worked in it. The agent ran code from the repository, and
- * the runner holds the GitHub token, so nothing that code may have planted is allowed to run
- * here: no hooks, no file-system monitor, no external diff, and no user or system config, which
- * can name filter and diff programs. The checkout's own `.git/config` is still read; the
- * agent's sandbox keeps it read-only.
- */
-export function gitAfterAgent(cwd: string, ...a: string[]): string {
-  return execFileSync("git", ["-c", `core.hooksPath=${devNull}`, "-c", "core.fsmonitor=false", "-c", "diff.external=", ...a], {
-    cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1" },
-  });
-}
-
 /** Checks the balance and the runner repository. Returns why not to contribute, or null. */
 export async function setup(
   cfg: ContributorConfig, token: string | null, flags: { dryRun: boolean; force: boolean },
@@ -400,6 +386,20 @@ async function log(gh: GitHub, cfg: ContributorConfig, t: TaskState, url: string
     return;
   }
   await gh.appendLine(t.runnerRepo, "contributions.jsonl", line, `Log ${t.type} contribution to ${t.repo}`);
+}
+
+/**
+ * git in a checkout after the agent worked in it. The agent ran code from the repository, and
+ * the runner holds the GitHub token, so nothing that code may have planted is allowed to run
+ * here: no hooks, no file-system monitor, no external diff, and no user or system config, which
+ * can name filter and diff programs. The checkout's own `.git/config` is still read; the
+ * agent's sandbox keeps it read-only.
+ */
+export function gitAfterAgent(cwd: string, ...a: string[]): string {
+  return execFileSync("git", ["-c", `core.hooksPath=${devNull}`, "-c", "core.fsmonitor=false", "-c", "diff.external=", ...a], {
+    cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1" },
+  });
 }
 
 /** Checks the agent's work against the rules, then submits it with the marker, and logs it. */

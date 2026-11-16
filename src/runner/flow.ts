@@ -201,11 +201,6 @@ export async function pick(ctx: Context): Promise<{ task?: Pick; skipped: Record
   }
   const skipped: Record<string, string> = {};
   const now = new Date();
-  // Say so once, instead of "no enabled help type" for every repository.
-  const can = cfg.help_types.filter((t) => (SUPPORTED_TYPES as readonly string[]).includes(t));
-  if (can.length === 0) {
-    return { skipped: { all: `help_types lists only help this runner cannot do yet (${cfg.help_types.join(", ") || "nothing"}). It does: ${SUPPORTED_TYPES.join(", ")}.` } };
-  }
   // First every target and its rejections: a spam rejection anywhere slows the contributor
   // down everywhere.
   const targets: { target: Target; rejections: Rejection[] }[] = [];
